@@ -1,0 +1,551 @@
+<title>H2 Pipeline Suite Project Reference</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono&display=swap">
+<style>:root{--bg:#f7f9f8;--surface:#fff;--ink:#15211d;--muted:#586862;--line:#d3dbd7;--accent:#0b6b66;--soft:#dcefec;
+--body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;--head:'IBM Plex Sans Condensed','Arial Narrow',system-ui,sans-serif;--mono:'IBM Plex Mono',Consolas,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1412;--surface:#161f1c;--ink:#e4ebe8;--muted:#9db0a9;--line:#2b3934;--accent:#3cb7ad;--soft:#173b37;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1412;--surface:#161f1c;--ink:#e4ebe8;--muted:#9db0a9;--line:#2b3934;--accent:#3cb7ad;--soft:#173b37;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.7 var(--body)}
+main{max-width:78ch;margin:0 auto;padding:36px 16px 80px}
+h1,h2,h3{font-family:var(--head);line-height:1.2;text-wrap:balance}h1{font-size:34px;margin:0 0 4px}
+h2{font-size:23px;margin:44px 0 10px;padding-top:14px;border-top:1px solid var(--line)}h3{font-size:18px;margin:26px 0 6px}
+a{color:var(--accent);overflow-wrap:anywhere}hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+code{font-family:var(--mono);font-size:.88em;background:var(--soft);padding:1px 5px;border-radius:3px}
+pre{background:var(--surface);border:1px solid var(--line);padding:12px;border-radius:6px;overflow-x:auto}pre code{background:none;padding:0}
+.tw{overflow-x:auto;margin:12px 0}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+li{margin:4px 0}p em:only-child{color:var(--muted)}</style>
+<main><h1 id="h2-pipeline-suite-project-reference">H2 Pipeline Suite — Project Reference</h1>
+<p><em>How the tool was researched, designed, built, verified and published, and how to keep working on it.</em></p>
+<p>Version 1.1 · October 2026 · Repository <code>vanadium1202/vanadium-Pcode</code>, folder <code>h2-pipeline-suite/</code>, branch <code>claude/hydrogen-pipeline-tool-tz9w95</code></p>
+<hr />
+<h2 id="1-purpose-of-this-document">1. Purpose of this document</h2>
+<p>This document records how H2 Pipeline Suite was produced. It explains what was asked for, which decisions were taken and why, how every calculation works, where each number comes from, how the results were checked, and what is still open. Use it as the starting point for any future change. A later engineer, or a later Claude session, should be able to read it, open the source folder and carry on without repeating the groundwork.</p>
+<p>The user guide for people who only <em>use</em> the tool is a separate document, <code>docs/User_Manual.html</code> (also as <code>dist/User_Manual.pdf</code>). This document is for the people who <em>maintain and extend</em> it.</p>
+<h2 id="2-the-brief">2. The brief</h2>
+<p>The request was for one interactive tool covering hydrogen transport by pipeline along three routes:</p>
+<ol>
+<li>conversion (repurposing) of an existing natural-gas pipeline to hydrogen;</li>
+<li>a new, purpose-built hydrogen pipeline;</li>
+<li>hydrogen blended into an existing natural-gas pipeline.</li>
+</ol>
+<p>For all three, the tool had to deal with the full chain of considerations: the metallurgy of the existing line pipe, the mechanical properties of the steel, the blend percentage expressed as hydrogen partial pressure, permitted hardness, repair of hydrogen pipelines, and operating effects. The energy penalty of carrying a given hydrogen fraction through the same pipeline was named as an example.</p>
+<p>Further explicit requirements were:</p>
+<ul>
+<li>upload and download of data files and other documents;</li>
+<li>generation of a line pipe specification for a new hydrogen pipeline;</li>
+<li>specifications for the instruments and equipment such a pipeline needs;</li>
+<li>a separate hydrogen safety module covering both leaks and ruptures, with calculated safe zones;</li>
+<li>a design-calculation option for a hydrogen pipeline;</li>
+<li>a separate module for blending hydrogen into city gas distribution (CGD), showing how the blend changes the Wobbe index;</li>
+<li>references for calculations and values wherever possible;</li>
+<li>synthetic cases for verification;</li>
+<li>a plain-language user manual;</li>
+<li>free choice of language, but the result had to be portable and easy to run on both Windows and Mac laptops.</li>
+</ul>
+<p>In a follow-up message the user asked for the hydrogen provisions of <strong>IGEM/TD/1</strong> (UK) and <strong>CSA Z662</strong> (Canada) to be added. Finally the user asked for this reference document.</p>
+<h2 id="3-how-the-work-proceeded-overview">3. How the work proceeded — overview</h2>
+<p>The work ran in nine stages, in this order:</p>
+<ol>
+<li><strong>Research.</strong> Targeted web searches on the governing codes and the key technical correlations. Their purpose was to confirm values and to find out which ones could <em>not</em> be confirmed.</li>
+<li><strong>Technology decision.</strong> A single self-contained HTML file, assembled from modular source files by a small build script.</li>
+<li><strong>Calculation engine.</strong> A library of pure functions with no user interface, so it can be tested on its own in Node.js. It was validated against reference data before any screens were built on top of it.</li>
+<li><strong>Reference data library.</strong> References, code tables, grade data, compositions, tolerance tables, the repair matrix and the equipment datasheet library.</li>
+<li><strong>User-interface framework.</strong> State handling, form generation, charts, file upload and download, the document library and report export.</li>
+<li><strong>Modules.</strong> Eighteen modules in three source files, plus the application shell.</li>
+<li><strong>Verification.</strong> Engine tests, independent hand calculations in Python with GERG-2008 reference data, and browser smoke tests at desktop and phone widths in light and dark themes. Defects found were fixed.</li>
+<li><strong>Documentation and publishing.</strong> User manual (HTML and PDF), README files, commits to the feature branch and a private hosted copy on claude.ai.</li>
+<li><strong>Extension.</strong> IGEM/TD/1 Supplement 2 and CSA Z662:23 Clause 17 added as selectable design bases, followed by this document.</li>
+</ol>
+<p>The sections below describe each stage in detail.</p>
+<h2 id="4-research">4. Research</h2>
+<h3 id="41-approach">4.1 Approach</h3>
+<p>The aim of the research was narrow. The general physics and the structure of the codes were already known, so the searches were used to pin down specific numbers and to check claims before relying on them. Each search targeted one question, for example "what are the Option A and Option B limits in ASME B31.12?" or "what PIR constant does industry use for hydrogen?". Several important source sites (the PNGRB, IChemE, ScienceDirect and CSA Group servers, and the Dutch mirror of EIGA Doc 121) were blocked by the session's network policy. For those, only the search-engine summaries could be read, not the documents.</p>
+<h3 id="42-what-was-confirmed">4.2 What was confirmed</h3>
+<ul>
+<li><strong>ASME B31.12 Option A versus Option B.</strong> Confirmed from a comparison table in an IOCL submission to PNGRB:</li>
+<li>Option A caps the design factor at 0.5; Option B allows up to 0.72.</li>
+<li>Option B requires K<sub>IH</sub> ≥ 55 MPa√m; Option A sets no K<sub>IH</sub> requirement.</li>
+<li>Option B limits phosphorus to ≤ 0.015 % and requires inclusion-shape control.</li>
+<li>Strength limits are 70/100 ksi (yield/tensile) for Option A and 80/110 ksi for Option B.</li>
+<li>Weld hardness is capped at 235 HV10 under both options.</li>
+<li><strong>Potential impact radius (PIR) constants.</strong> A 2025 PHMSA-funded report states the constants industry uses in r = k·d·√p (ft, in, psi): 0.47 for hydrogen, 0.69 for lean natural gas, 0.73 for rich natural gas.</li>
+<li><strong>India, PNGRB 2024 preliminary CGD limits:</strong></li>
+<li>pipelines, fittings and rubber 10 %, with line pipe restricted to X52;</li>
+<li>carbon-steel valves 20 %;</li>
+<li>CNG compressors 25 %;</li>
+<li>engines and dispensers 3 %;</li>
+<li>domestic burners 10 %;</li>
+<li>CNG cylinders 2 % (IS 15490);</li>
+<li>meters 10 % with recalibration.</li>
+</ul>
+<p>Pilots have run at 2–8 %, for example 8 % at NTPC Kawas. No final national cap had been notified.
+- <strong>API 5L 47th edition.</strong> Published in June 2026. No hydrogen annex is evident from the announcements, so the specification generator treats API 5L PSL2 plus supplementary hydrogen requirements as the base.
+- <strong>Code Case 2938.</strong> Gives fatigue crack growth design curves for ferritic steels in gaseous hydrogen. They were derived at about 106 MPa, and a fugacity-based pressure correction exists in CC2938-1 and B31.12 Code Case 220. At low ΔK the rates depend on pressure; at high ΔK they are nominally pressure-independent.
+- <strong>EIGA Doc 121/14.</strong> Hardness about 250 HB (22 HRC), CE ≤ 0.43, preference for X52/L360 or lower and normalised steels. Scope 1–21 MPa and −40 to 175 °C.
+- <strong>Gas quality.</strong> The UK GS(M)R Wobbe range is 46.5–51.41 MJ/m³ from April 2025, with H2 ≤ 0.1 mol %. CEN's proposed EN 16726 entry range is 46.44–54.00 MJ/m³.
+- <strong>Hydrogen effects in blends</strong> (DOE HyBlend, NREL): fracture resistance falls even below 1 bar of H2 partial pressure.
+- <strong>Large hydrogen jet flames.</strong> A radiant fraction of about 0.16 is supported by Ekoto et al. The Froude-number flame-length framework of Schefer/Houf, with L* = 23 in the momentum regime (Delichatsios), holds up to 413 bar.
+- <strong>IGEM/TD/1 Ed. 6 Supplement 2</strong> (follow-up research):
+  - it is based on ASME B31.12;
+  - the design factor is capped at 0.5;
+  - the B31.12 Hf is applied to grades above L360, with Hf taken for pressures ≤ 137.9 barg;
+  - blends above 10 mol % H2 are treated as 100 % H2;
+  - fracture-toughness testing in hydrogen is required (clause S5.3.4);
+  - a repurposing procedure is included;
+  - UK practice uses CE ≤ 0.43.
+  - Separately, the EPRG guideline suggests relaxing weld hardness to 275 HV10 average and 300 HV10 maximum.
+- <strong>CSA Z662:23</strong> (9th edition):
+  - it added a new Clause 17 for hydrogen and hydrogen-blend pipeline systems;
+  - the clause works through engineering assessments, not fixed numeric limits;
+  - it cites ASME B31.12 as guidance;
+  - CSA Group's own research applies the B31.12 Hf below 2 000 psig.</p>
+<h3 id="43-what-could-not-be-confirmed-and-how-the-tool-handles-it">4.3 What could not be confirmed (and how the tool handles it)</h3>
+<p>These items are typed into the tool from memory or from secondary sources. All of them are <strong>editable</strong> in the <em>Code tables</em> module and flagged in the tool and the manual:</p>
+<ul>
+<li><strong>B31.12 Table IX-5A Hf values.</strong> The four rows (≤ 66, 75, 82, 90 ksi) and seven pressure columns (1 000 to 3 000 psig) are from recollection of the table. No primary source was available.</li>
+<li><strong>B31.12 Option B design factors by class.</strong> Only the 0.72 maximum is confirmed. The class-by-class values 0.72/0.72/0.60/0.50/0.40 are assumed.</li>
+<li><strong>Code Case 2938 constants.</strong> C = 3.5×10⁻¹⁴, m = 6.5 with f(R) = (1 + 0.4286R)/(1 − R) at low ΔK, and C = 1.5×10⁻¹¹, m = 3.66 with f(R) = (1 + 2R)/(1 − R) at high ΔK. The √(pH2/106 MPa) pressure scaling is the tool's approximation of the fugacity correction.</li>
+<li><strong>IGEM design factors for location classes S and T</strong> (0.3), and the mapping Class 1 → R, Class 2 → S, Classes 3–4 → T.</li>
+<li><strong>CSA Z662 location factors</strong> L = 1.0/1.0/0.9/0.7/0.55 with F = 0.8, and the decision to govern Clause 17 by the lower of the Z662 F·L and the B31.12 Option A factor. This is the tool's interpretation, stated as such in the interface.</li>
+<li><strong>EIGA hardness.</strong> The source states it in HB (≈ 250 HB). The tool screens base metal at 250 HV10, the ISO 3183 Annex H convention.</li>
+</ul>
+<h3 id="44-principal-sources">4.4 Principal sources</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IOCL submission to PNGRB (B31.12 A/B)</td>
+<td><a href="https://pngrb.gov.in/pdf/press-note/IOCL_20241017.pdf" target="_blank" rel="noopener">https://pngrb.gov.in/pdf/press-note/IOCL_20241017.pdf</a></td>
+</tr>
+<tr>
+<td>PHMSA, PIR in blended H2-NG pipelines (2025)</td>
+<td><a href="https://primis.phmsa.dot.gov/rd/FileGet/20878/2025-03-30%20Public%20Quarterly%20Report%202%20-%20PIR%20in%20Blended%20H2-NG%20Pipelines.pdf" target="_blank" rel="noopener">https://primis.phmsa.dot.gov/rd/FileGet/20878/2025-03-30%20Public%20Quarterly%20Report%202%20-%20PIR%20in%20Blended%20H2-NG%20Pipelines.pdf</a></td>
+</tr>
+<tr>
+<td>PNGRB Hydrogen Knowledge Paper</td>
+<td><a href="https://pngrb.gov.in/pdf/hydrogen-corner/PNGRB_Hydrogen_Knowledge_Paper.pdf" target="_blank" rel="noopener">https://pngrb.gov.in/pdf/hydrogen-corner/PNGRB_Hydrogen_Knowledge_Paper.pdf</a></td>
+</tr>
+<tr>
+<td>PNGRB press note March 2024</td>
+<td><a href="https://pngrb.gov.in/pdf/press-note/PressRelease07032024.pdf" target="_blank" rel="noopener">https://pngrb.gov.in/pdf/press-note/PressRelease07032024.pdf</a></td>
+</tr>
+<tr>
+<td>API 5L 47th edition</td>
+<td><a href="https://www.api.org/news-policy-and-issues/news/2026/06/02/api-announces-47th-edition-of-api-specification-5l" target="_blank" rel="noopener">https://www.api.org/news-policy-and-issues/news/2026/06/02/api-announces-47th-edition-of-api-specification-5l</a></td>
+</tr>
+<tr>
+<td>Sandia, FCG rules in hydrogen</td>
+<td><a href="https://www.sandia.gov/research/publications/details/technical-basis-for-fatigue-crack-growth-rules-in-gaseous-hydrogen-for-asme-2024-01-01/" target="_blank" rel="noopener">https://www.sandia.gov/research/publications/details/technical-basis-for-fatigue-crack-growth-rules-in-gaseous-hydrogen-for-asme-2024-01-01/</a></td>
+</tr>
+<tr>
+<td>National Gas, gas quality</td>
+<td><a href="https://nationalgas.com/data-and-operations/quality" target="_blank" rel="noopener">https://nationalgas.com/data-and-operations/quality</a></td>
+</tr>
+<tr>
+<td>NREL TP-5400-81704</td>
+<td><a href="https://www.nrel.gov/docs/fy23osti/81704.pdf" target="_blank" rel="noopener">https://www.nrel.gov/docs/fy23osti/81704.pdf</a></td>
+</tr>
+<tr>
+<td>Structural Integrity, blending effects</td>
+<td><a href="https://www.structint.com/news-views-volume-52-understanding-the-effects-of-hydrogen-blending-on-pipeline-integrity/" target="_blank" rel="noopener">https://www.structint.com/news-views-volume-52-understanding-the-effects-of-hydrogen-blending-on-pipeline-integrity/</a></td>
+</tr>
+<tr>
+<td>Cosham et al., IGEM/TD/1 supplements</td>
+<td><a href="https://www.icheme.org/media/29620/hazards-32-paper-01-cosham.pdf" target="_blank" rel="noopener">https://www.icheme.org/media/29620/hazards-32-paper-01-cosham.pdf</a></td>
+</tr>
+<tr>
+<td>IGEM/TD/1 Supplement 2</td>
+<td><a href="https://www.igem.org.uk/resource/igem-td-1-edition-6-supplement-2-high-pressure-hydrogen-pipelines.html" target="_blank" rel="noopener">https://www.igem.org.uk/resource/igem-td-1-edition-6-supplement-2-high-pressure-hydrogen-pipelines.html</a></td>
+</tr>
+<tr>
+<td>EPRG hydrogen guideline</td>
+<td><a href="https://www.eprg.net/fileadmin/EPRG_Dokumente/EPRG_Hydrogen_Pipelines_Integrity_Management_and_Repurposing_Guideline.pdf" target="_blank" rel="noopener">https://www.eprg.net/fileadmin/EPRG_Dokumente/EPRG_Hydrogen_Pipelines_Integrity_Management_and_Repurposing_Guideline.pdf</a></td>
+</tr>
+<tr>
+<td>CSA Group, NG pipeline materials for H2</td>
+<td><a href="https://www.csagroup.org/article/research/assessment-of-natural-gas-pipeline-materials-for-hydrogen-service/" target="_blank" rel="noopener">https://www.csagroup.org/article/research/assessment-of-natural-gas-pipeline-materials-for-hydrogen-service/</a></td>
+</tr>
+<tr>
+<td>CSA Z662:23</td>
+<td><a href="https://www.csagroup.org/store/product/2430394/" target="_blank" rel="noopener">https://www.csagroup.org/store/product/2430394/</a></td>
+</tr>
+<tr>
+<td>AUC Hydrogen Inquiry</td>
+<td><a href="https://open.alberta.ca/dataset/8fbe8453-8975-4ede-afa1-bbfaade17afb/resource/29d9fd21-36ad-4459-aa55-effd627df09d/download/energy-auc-hydrogen-inquiry-final-report-2022.pdf" target="_blank" rel="noopener">https://open.alberta.ca/dataset/8fbe8453-8975-4ede-afa1-bbfaade17afb/resource/29d9fd21-36ad-4459-aa55-effd627df09d/download/energy-auc-hydrogen-inquiry-final-report-2022.pdf</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>The tool itself carries 72 tagged references (R1–R72) in <code>src/data.js</code>. Each result in the interface shows the tags of the sources behind it.</p>
+<h2 id="5-technology-decision">5. Technology decision</h2>
+<p>The user left the choice of language open but required easy portability to Windows and Mac. Python would have needed an interpreter, packages and either a terminal or a GUI toolkit on each laptop. A compiled desktop application would have needed separate builds for each operating system. A <strong>single HTML file</strong> runs in the browser every laptop already has. It needs no installation and works offline, and it can still hold rich interaction, charts and file handling. That is why HTML was chosen.</p>
+<p>The design that follows from that choice:</p>
+<ul>
+<li><strong>One file, built from many.</strong> The source is split into readable files under <code>src/</code>. <code>build.py</code> concatenates them into <code>dist/H2_Pipeline_Suite.html</code> (about 250 kB) and also writes a body-only version to <code>build/artifact/index.html</code> for the hosted copy.</li>
+<li><strong>No external libraries.</strong> Charts are drawn by a small SVG routine in <code>ui.js</code>. This keeps the file self-contained and avoids version and CDN problems. The only external request is the IBM Plex web font. If it is unavailable, system fonts are used.</li>
+<li><strong>Storage.</strong> Inputs are saved automatically in the browser's local storage. Uploaded documents are kept in the browser's IndexedDB. For anything durable the user saves a <strong>project file</strong> (<code>.h2proj.json</code>), which can optionally include the documents encoded inside it.</li>
+<li><strong>Downloads.</strong> From a local file, normal browser downloads are used. In the hosted claude.ai viewer, plain downloads are blocked. There the page uses the platform's <code>downloads</code> capability, which asks the viewer to confirm each save. Word exports are saved as <code>.html</code> because the platform does not accept <code>.doc</code>. If saving fails, a dialog shows the content for copy and paste.</li>
+<li><strong>Phone and tablet use.</strong> The layout collapses to one column below about 860 px and was tested at 400 px width without horizontal scrolling.</li>
+</ul>
+<h2 id="6-architecture">6. Architecture</h2>
+<h3 id="61-source-files">6.1 Source files</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/engine.js</code></td>
+<td>Pure calculation functions (SI units internally). Exported as <code>window.H2E</code> in the browser and as a Node.js module for tests.</td>
+</tr>
+<tr>
+<td><code>src/data.js</code></td>
+<td>References, default code tables, grades, pipe sizes and walls, gas presets, seam types, tolerance tables, Wobbe ranges, burning-velocity table, repair matrix, equipment library, IGEM/CSA requirement matrix and blend rules (<code>window.H2D</code>).</td>
+</tr>
+<tr>
+<td><code>src/ui.js</code></td>
+<td>State, persistence, number formatting, reference chips, tables, SVG line charts, toasts, file download/upload, CSV parser, IndexedDB library, form generation, report export (<code>window.H2U</code>).</td>
+</tr>
+<tr>
+<td><code>src/modules1.js</code></td>
+<td>Project, Gas properties, Repurposing, Blending, New design, CGD.</td>
+</tr>
+<tr>
+<td><code>src/modules2.js</code></td>
+<td>ILI, Fatigue &amp; fracture, Hydrogen safety, Repair, Operations.</td>
+</tr>
+<tr>
+<td><code>src/modules3.js</code></td>
+<td>Line pipe specification, Instruments &amp; equipment, Files &amp; data, Code tables, Verification, References, About.</td>
+</tr>
+<tr>
+<td><code>src/app.js</code></td>
+<td>Navigation, routing by URL hash, page rendering, toolbar actions, theme.</td>
+</tr>
+<tr>
+<td><code>src/style.css</code></td>
+<td>Design tokens with light and dark themes, layout, components, charts, safe-zone diagrams, responsive rules.</td>
+</tr>
+<tr>
+<td><code>src/shell.html</code></td>
+<td>Page skeleton into which CSS and JS are inserted.</td>
+</tr>
+<tr>
+<td><code>build.py</code></td>
+<td>Assembles the deliverables.</td>
+</tr>
+<tr>
+<td><code>tests/</code></td>
+<td><code>run_tests.js</code> (engine), <code>hand_calcs.py</code> (independent checks), <code>smoke_ui.js</code> (browser).</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>User manual and this reference document.</td>
+</tr>
+<tr>
+<td><code>dist/</code></td>
+<td>Built deliverables for the user.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="62-state-model">6.2 State model</h3>
+<p>All user data lives in one state object <code>S</code>:</p>
+<ul>
+<li><code>meta</code> — project title, client, engineer, revision, date;</li>
+<li><code>settings</code> — energy basis HHV/LHV, metering reference, Z calibration factor, theme;</li>
+<li><code>tables</code> — the editable code tables;</li>
+<li><code>gasName</code> and <code>gas</code> — the base natural-gas composition shared by all modules;</li>
+<li><code>m</code> — inputs per module, keyed by module id;</li>
+<li><code>ili</code> — the uploaded ILI listing;</li>
+<li><code>press</code> — the uploaded pressure history;</li>
+<li><code>design</code> — the selected new-pipeline design. The design module writes it; the specification and equipment modules read it.</li>
+</ul>
+<p>When saved data is loaded, the default code tables are merged underneath it. Older project files therefore pick up any table added later, such as the IGEM and CSA factors.</p>
+<h3 id="63-the-module-contract">6.3 The module contract</h3>
+<p>Every module is an object pushed onto the <code>window.H2M</code> list. It has these members:</p>
+<ul>
+<li><code>id</code>, <code>group</code>, <code>nav</code>, <code>title</code>, <code>intro</code> — identity and texts;</li>
+<li><code>sections</code> — an array, or a function returning one, of <code>{title, fields}</code>. Each field is <code>{k, l, u, t, v, o, h, ref, share}</code>:</li>
+<li><code>k</code>: key;</li>
+<li><code>l</code>: label;</li>
+<li><code>u</code>: unit;</li>
+<li><code>t</code>: type — <code>num</code>, <code>sel</code>, <code>txt</code>, <code>chk</code> or <code>area</code>;</li>
+<li><code>v</code>: default value, which may be a function;</li>
+<li><code>o</code>: options;</li>
+<li><code>h</code>: help text;</li>
+<li><code>ref</code>: reference tags;</li>
+<li><code>share</code>: the project key it can be filled from.</li>
+<li><code>compute(values)</code> — returns <code>{html, csv}</code>. The framework calls it again about 180 ms after each edit.</li>
+<li>Optional <code>extra()</code> and <code>bind()</code> — add custom input widgets, for example the composition grid or the upload buttons.</li>
+<li>Optional <code>after()</code> — attaches handlers to buttons inside the results, for example the specification export.</li>
+<li>Pages without a calculation (Files, Code tables, Verification, References, About) supply <code>page()</code> and <code>bindPage()</code> instead.</li>
+</ul>
+<p>The toolbar comes from the framework and is the same for every module:</p>
+<ul>
+<li><em>Fill from project</em> copies the <code>share</code> fields from the Project module;</li>
+<li><em>Reset inputs</em>;</li>
+<li>report export as HTML and for Word;</li>
+<li>CSV of the main results table.</li>
+</ul>
+<p>A report contains the inputs, the results and only the references actually cited in those results.</p>
+<h2 id="7-calculation-methods">7. Calculation methods</h2>
+<p>All internal calculations use SI units. Pressures enter in barg and are converted to pascals absolute by adding 101 325 Pa.</p>
+<h3 id="71-gas-properties">7.1 Gas properties</h3>
+<ul>
+<li><strong>Heating value, density, relative density and Wobbe index</strong> follow ISO 6976:2016. Molar gross and net heating values at 15 °C combustion are combined with the summation-factor compressibility at the reference state. Hydrogen and helium have positive second virial coefficients, so they are added as a small positive term instead of through the squared summation. Metering references of 15 °C, 0 °C, 60 °F and 20 °C are available. The values reproduce the ISO 6976 entries for methane (37.78 MJ/m³) and hydrogen (12.10 MJ/m³). They also reproduce the EN 437 test-gas Wobbe indices for G20 (50.72) and G222 (47.87).</li>
+<li><strong>Compressibility at line conditions</strong> uses the Peng–Robinson equation with literature binary interaction parameters, including H2–CH4.</li>
+<li>The first version was plain Peng–Robinson. It was compared with GERG-2008 and Leachman values from CoolProp on a grid: methane, hydrogen, 10/20/50 % blends and two natural gases, at 10–150 bar and 0–40 °C. The mean error was 2.2 % and the maximum 4.8 %, which is not good enough.</li>
+<li>Several variants were then tested: Soave–Redlich–Kwong, quantum-corrected hydrogen critical constants, and a Peneloux-type volume translation.</li>
+<li>Peng–Robinson with Jhaveri–Youngren volume translation gave the best result: mean error 0.6 %, maximum about 1.5 % up to 100 bar. Methane at 70 bar comes out at 0.864 against 0.871; hydrogen at 100 bar at 1.0626 against 1.0615.</li>
+<li>A user Z multiplier is provided so that results can be matched to a company AGA 8 or GERG value.</li>
+<li><strong>Viscosity</strong> uses Sutherland's law per component and Wilke mixing. The methane constant was tuned so that methane matches CoolProp within 0.2 %.</li>
+<li><strong>Heat capacity and isentropic exponent</strong> use ideal-gas polynomials from Smith–Van Ness–Abbott.</li>
+<li><strong>Flammability limits</strong> of mixtures use Le Chatelier's rule. The stoichiometric air requirement and fuel mass fraction come from the combustion reactions.</li>
+</ul>
+<h3 id="72-hydraulics-and-the-energy-penalty">7.2 Hydraulics and the energy penalty</h3>
+<ul>
+<li><strong>Pipe flow</strong> uses the isothermal general flow equation in mass form, p₁² − e^s·p₂² = f·Lₑ·G²·Z·R·T / (D·M). Here f is the Darcy friction factor from Colebrook–White, Z is evaluated at the standard average pressure, and an elevation correction is applied through s and Lₑ. A pipeline efficiency factor scales the friction. The tool can solve for flow from both pressures, outlet pressure from flow, or inlet pressure from flow. The tests check that the three solvers invert each other to better than 0.02 bar.</li>
+<li><strong>Compression</strong> is modelled as multi-stage isentropic compression with intercooling. The stage ratio is limited to 3. The head uses the mean Z and the ideal isentropic exponent, an isentropic efficiency is applied, and a driver efficiency converts shaft power into fuel or electricity.</li>
+<li><strong>Energy loss</strong> — the user's example question — is defined explicitly. It is the driver energy needed to restore the pressure drop of the pipeline segment, as a percentage of the energy delivered. It is computed for any blend on two bases: equal energy delivered, where the tool finds the flow and inlet pressure, or equal pressures, which gives maximum capacity. The results are also expressed per 100 km.</li>
+<li><strong>Other blend effects</strong> reported alongside: leakage energy for choked (orifice) or laminar leaks, line-pack energy, outlet velocity against the API RP 14E erosional velocity, Wobbe change and hydrogen partial pressure.</li>
+<li>A sanity test confirms that pure hydrogen carries 75–85 % of the natural-gas energy at equal pressures. The tool gives 78.7 %, in line with the literature.</li>
+</ul>
+<h3 id="73-strength-codes-and-maop">7.3 Strength, codes and MAOP</h3>
+<ul>
+<li><strong>Barlow design pressure:</strong> P = 2·S·t/D·F·E·T·Hf, with the B31.8 temperature derating table.</li>
+<li><strong>B31.12 Option A</strong> solves P = P₀·Hf(P) by bisection, because Hf depends on pressure.</li>
+<li><strong>Hf rows are strength bands, not an interpolation axis.</strong> The first version interpolated between rows and gave Hf = 0.99 for X52 PSL2, whose SMTS of 66.7 ksi is just above the 66 ksi row. That was corrected: a grade now uses the first band whose SMTS it does not exceed, with 1 ksi tolerance, and interpolation applies only across pressure.</li>
+<li><strong>One function handles all four code bases.</strong> <code>codeFactor</code> and <code>codeAllowP</code> in <code>engine.js</code> cover B31.12 Option A, Option B, IGEM/TD/1 Supplement 2 and CSA Z662 Clause 17, so every module uses the same logic.</li>
+<li><strong>The hydrotest ratio follows B31.8 by class,</strong> with a floor of 1.25 for hydrogen service. The floor is a tool default, not a code value.</li>
+</ul>
+<h3 id="74-repurposing-screening">7.4 Repurposing screening</h3>
+<p>About 20 checks are run, each with a value, a criterion, a status, the reference and the action to take:</p>
+<ul>
+<li>base-metal and weld/HAZ hardness;</li>
+<li>hard spots, using the 49 CFR §192.309 definition;</li>
+<li>seam type and vintage;</li>
+<li>grade and maximum strength limits of each option;</li>
+<li>CE(IIW) and Pcm;</li>
+<li>sulphur and phosphorus;</li>
+<li>Charpy energy and DWTT;</li>
+<li>K<sub>IH</sub> in hydrogen;</li>
+<li>crack-like features;</li>
+<li>dents;</li>
+<li>metal loss;</li>
+<li>girth-weld practice;</li>
+<li>hydrotest record;</li>
+<li>cathodic-protection potential;</li>
+<li>hoop stress at the hydrogen MAOP;</li>
+<li>pressure cycling.</li>
+</ul>
+<p>The overall verdict counts the red and amber results. The module also states the new MAOP under all four code bases and the energy capacity after conversion. It shows the code-requirements matrix (B31.12, IGEM, CSA, EIGA) with checks against the entered data.</p>
+<h3 id="75-defects-fatigue-and-fracture">7.5 Defects, fatigue and fracture</h3>
+<ul>
+<li><strong>Metal loss</strong> is assessed by Modified B31G (0.85dL, flow stress SMYS + 69 MPa), giving failure pressure, safe pressure and ERF.</li>
+<li><strong>Crack-like flaws</strong> use the Newman–Raju semi-elliptical surface-crack stress intensity at the deepest and surface points, multiplied by a Folias-based bulging factor (API 579 form). The result is compared with K<sub>IH</sub>.</li>
+<li><strong>Fatigue crack growth</strong> integrates the Code Case 2938 two-segment law (minimum of the low- and high-ΔK expressions) or the BS 7910 air law. Depth and length grow independently over load blocks. A block is either constant-amplitude cycling or the rainflow-counted (ASTM E1049) uploaded SCADA history, binned to 0.5 bar. Growth stops when Kmax reaches K<sub>IH</sub> or the depth reaches 80 % of wall. Allowable life is the calculated life divided by 2, following the ASME VIII-3 KD-10 convention; the factor is editable.</li>
+<li><strong>Ductile fracture arrest</strong> uses the Battelle two-curve method. The gas decompression wave speed comes from ideal-gas isentropic expansion using the mixture's isentropic exponent and sound speed. The fracture-velocity and arrest-stress relations are written with Charpy energy per ligament area: J/mm² in the velocity term and N/mm in the arrest term. A unit error at this point was caught during development by checking that the arrest pressure came out realistic. The Leis correction is applied above 95 J. The tests confirm that pure hydrogen, with its fast decompression, needs far less arrest toughness than a rich natural gas.</li>
+</ul>
+<h3 id="76-safety">7.6 Safety</h3>
+<ul>
+<li><strong>Leak.</strong> Choked or subsonic orifice discharge is calculated first. A Birch (1987) notional nozzle conserves mass and momentum. Visible flame length uses the Delichatsios/Schefer–Houf Froude correlation, with L* = 23 in the momentum regime. Radiation uses a point source at mid-flame. The radiant fraction defaults to an energy-weighted value between 0.16 (large hydrogen flames) and 0.20 (natural gas).</li>
+<li><strong>Flammable cloud.</strong> Distances to LFL and ½ LFL along the jet axis use Chen–Rodi centreline decay. The flammable mass in the jet is estimated by integrating jet transit time. It feeds a TNT-equivalence overpressure estimate using the Mills fit. Fatality distances use the Eisenberg probit.</li>
+<li><strong>Rupture.</strong> The potential impact radius uses the generalised Stephens (C-FER/GRI) model: release-rate decay 0.33, Cd 0.62, two ends, combustion efficiency 0.35 and an emissivity factor.</li>
+<li>With the textbook natural-gas emissivity of 0.2 the model gives k = 0.72, within 4 % of the B31.8S constant 0.69.</li>
+<li>The hydrogen emissivity was calibrated to 0.11 so that pure hydrogen reproduces the industry constant 0.47.</li>
+<li>For blends the emissivity is interpolated by energy fraction. The code-constant PIR is shown next to the model value.</li>
+<li>Thermal radii for every threshold and a delayed-ignition explosion estimate (assumption-driven, clearly labelled) complete the rupture case.</li>
+<li><strong>Safe-zone diagrams</strong> for leak and rupture are drawn to scale in SVG.</li>
+</ul>
+<h3 id="77-cgd-blending">7.7 CGD blending</h3>
+<p>The Wobbe index is computed across the blend sweep and checked against the selected acceptance range and an appliance tolerance band. The module also reports:</p>
+<ul>
+<li>appliance heat-input change (proportional to Wobbe at fixed nozzle and pressure);</li>
+<li>the extra volume needed for the same energy (relevant to volumetric billing);</li>
+<li>network energy capacity (also proportional to Wobbe);</li>
+<li>stoichiometric laminar burning velocity from the Hu et al. (2009) data, as a flashback indicator;</li>
+<li>CO₂ reduction per unit of energy;</li>
+<li>component and end-use limits, including the PNGRB preliminary limits.</li>
+</ul>
+<h3 id="78-repair-operations-specifications">7.8 Repair, operations, specifications</h3>
+<ul>
+<li><strong>Repair.</strong> A matrix of seven methods against nine defect types (recommended, conditional, not recommended), with hydrogen-specific notes. Welding indices CE(IIW), Pcm and CET, the EN 1011-2 method B preheat, and warnings for live welding on hydrogen and burn-through risk.</li>
+<li><strong>Operations.</strong> Section inventory and vent-limited blowdown time (isothermal, choked), vented energy and greenhouse impact (GWP100: CH4 29.8, H2 11.6), purge guidance, and a comparison of the integrity-management programme for natural gas and hydrogen.</li>
+<li><strong>Line pipe specification.</strong> An API 5L PSL2 supplement for hydrogen:</li>
+<li>chemistry limits in the Annex H style;</li>
+<li>Y/T ≤ 0.90;</li>
+<li>hardness ≤ 250/235 HV10;</li>
+<li>Charpy taken from the fracture-arrest result, plus DWTT;</li>
+<li>hydrogen tests: K<sub>IH</sub>, fatigue crack growth and J-R in hydrogen, HIC as a cleanliness check, microstructure;</li>
+<li>NDT, hydrotest, coating and documentation.</li>
+</ul>
+<p>Consistency checks are code-aware; IGEM requires toughness testing, for example. The specification exports as HTML or for Word.
+- <strong>Equipment datasheets.</strong> Fifteen datasheets filled from the design data, each with hydrogen-specific requirements and standards. API 520 PSV sizing (critical gas flow) selects the API 526 orifice.</p>
+<h2 id="8-verification">8. Verification</h2>
+<h3 id="81-synthetic-test-cases">8.1 Synthetic test cases</h3>
+<p>The <em>Verification</em> module and <code>tests/run_tests.js</code> run 19 cases. All pass. Their expected values come from three kinds of source:</p>
+<ul>
+<li><strong>Published values:</strong></li>
+<li>ISO 6976 heating values of methane and hydrogen;</li>
+<li>EN 437 Wobbe of G20 and G222;</li>
+<li>the API 520 worked example (3 698 mm²);</li>
+<li>the ASTM E1049 rainflow example;</li>
+<li>the B31.8S PIR constant 0.69 and the hydrogen PIR constant 0.47.</li>
+<li><strong>Independent calculations</strong> (<code>tests/hand_calcs.py</code>, a separate implementation in Python):</li>
+<li>Modified B31G;</li>
+<li>EN 1011-2 preheat;</li>
+<li>the Code Case 2938 rate;</li>
+<li>the general flow equation, solved with Newton–Colebrook and GERG-2008 compressibility from CoolProp. The JavaScript result is within 0.5 % of it.</li>
+<li><strong>Hand checks:</strong> Barlow; the IGEM allowable pressure (0.5, no Hf at L360); the CSA F·L pressure; and the Mills overpressure fit.</li>
+</ul>
+<p>Eleven further consistency tests check that:</p>
+<ul>
+<li>the flow solvers invert each other;</li>
+<li>Wobbe falls with increasing hydrogen;</li>
+<li>hydrogen energy capacity lies in the expected range;</li>
+<li>Hf behaves correctly for X52 and X70;</li>
+<li>BTCM ranks hydrogen against rich gas correctly;</li>
+<li>fatigue life in hydrogen is shorter than in air;</li>
+<li>the 25 mm hydrogen release rate is plausible;</li>
+<li>the Le Chatelier LFL is correct.</li>
+</ul>
+<p>The built-in synthetic project cases are:</p>
+<ul>
+<li>a 24″ X52 HFW line, 120 km, MAOP 70 barg, re-rating to about 56 barg under Option A;</li>
+<li>a 20 % blend in the same line;</li>
+<li>a 500 t/d pure-hydrogen line, 150 km, 60 → 30 barg (selects 16″ × 7.9 mm X52);</li>
+<li>a 12-anomaly ILI listing;</li>
+<li>a 60-day hourly SCADA pressure history;</li>
+<li>a 10 % RLNG CGD case.</li>
+</ul>
+<h3 id="82-browser-tests">8.2 Browser tests</h3>
+<p><code>tests/smoke_ui.js</code> (Playwright with Chromium) runs these checks:</p>
+<ol>
+<li>Opens the built file and loads the synthetic ILI and pressure data.</li>
+<li>Visits every module and fails on any console error or any NaN, "undefined" or error text in the output.</li>
+<li>Switches the equipment module to the PSV and checks the sizing.</li>
+<li>Checks for horizontal overflow at 400 px width.</li>
+</ol>
+<p>Screenshots of every module in light and dark themes were inspected visually. Separate scripts exercised the IGEM and CSA options in the repurposing and design modules.</p>
+<h3 id="83-defects-found-and-fixed-during-development">8.3 Defects found and fixed during development</h3>
+<ul>
+<li>The page's <code>[hidden]</code> dialog was still displayed in the standalone file, so it blocked clicks. Fixed with a global <code>[hidden]{display:none}</code>.</li>
+<li>Key–value result tables overflowed at phone width. They now stack, and long text values wrap.</li>
+<li>Hf was interpolated between strength rows (X52 gave 0.99). Changed to band selection.</li>
+<li>The fatigue chart showed R = 1.00, because rounding in the rainflow bins made pmax equal pmin. Degenerate bins are now removed and the dominant cycle is used for display.</li>
+<li>Long text in the materials-exposure table overflowed. Values longer than about 26 characters are now shown as wrapping text.</li>
+<li>The first version of the PIR model omitted the 0.35 combustion efficiency and over-predicted by about 75 %. It was corrected before release.</li>
+<li>The suite README was missing from the first commit because an earlier command in the same shell chain failed. It was written and committed with v1.1.</li>
+</ul>
+<h2 id="9-deliverables-and-where-they-are">9. Deliverables and where they are</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Deliverable</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool (double-click to open)</td>
+<td><code>h2-pipeline-suite/dist/H2_Pipeline_Suite.html</code></td>
+</tr>
+<tr>
+<td>User manual</td>
+<td><code>dist/User_Manual.html</code>, <code>dist/User_Manual.pdf</code> (source <code>docs/User_Manual.html</code>)</td>
+</tr>
+<tr>
+<td>This reference</td>
+<td><code>docs/Project_Reference.md</code> (also published as a page)</td>
+</tr>
+<tr>
+<td>Source and tests</td>
+<td><code>src/</code>, <code>tests/</code>, <code>build.py</code></td>
+</tr>
+<tr>
+<td>Hosted copy (private to the owner)</td>
+<td><a href="https://claude.ai/artifact/K6feyY8qHt49agJVQoV24p" target="_blank" rel="noopener">https://claude.ai/artifact/K6feyY8qHt49agJVQoV24p</a></td>
+</tr>
+<tr>
+<td>Git</td>
+<td>branch <code>claude/hydrogen-pipeline-tool-tz9w95</code> of <code>vanadium1202/vanadium-Pcode</code>. No pull request has been opened.</td>
+</tr>
+</tbody>
+</table></div>
+<p>To use the tool on the home Mac, open the hosted link. Alternatively, download <code>dist/H2_Pipeline_Suite.html</code> from the branch on GitHub and double-click it. To carry inputs between computers, use <em>Files &amp; data → Save project</em> on one machine and <em>Open project</em> on the other.</p>
+<h2 id="10-how-to-maintain-and-extend">10. How to maintain and extend</h2>
+<h3 id="rebuild-and-test-after-any-change">Rebuild and test after any change</h3>
+<pre><code>cd h2-pipeline-suite
+python3 build.py
+node tests/run_tests.js
+python3 tests/hand_calcs.py                       # needs: pip install CoolProp
+NODE_PATH=$(npm root -g) node tests/smoke_ui.js   # needs Playwright + Chromium
+</code></pre>
+<h3 id="typical-changes">Typical changes</h3>
+<ul>
+<li><strong>Correct a code value</strong> (for example the Hf table after checking the licensed B31.12). Users can change it in the <em>Code tables</em> module, and it is saved with their project. To change the shipped default, edit <code>DEFAULT_TABLES</code> in <code>src/data.js</code> and rebuild. Then check whether verification case V08 or V11 needs a new expected value.</li>
+<li><strong>Add a reference.</strong> Add <code>Rnn: [source, title, used-for]</code> to <code>REFS</code> in <code>data.js</code>, then cite it with <code>ref('Rnn')</code> in a module. It appears in reports automatically whenever it is used.</li>
+<li><strong>Add a module.</strong> Push a new object that follows the module contract (section 6.3) in one of the module files. Navigation, toolbar, persistence and reports come from the framework. Add its id to the manual and, if it calculates something new, add a verification case.</li>
+<li><strong>Add a verification case.</strong> Add a line to <code>verificationCases()</code> in <code>engine.js</code> with the computed expression, the expected value, a tolerance, and the basis of the expected value. Where possible, compute the expected value independently in <code>tests/hand_calcs.py</code>.</li>
+<li><strong>Add a code basis.</strong> Extend <code>codeFactor()</code> in <code>engine.js</code> and <code>CODES</code> in <code>data.js</code>. The repurposing, design and project modules pick it up automatically.</li>
+<li><strong>Update the hosted copy.</strong> Republish <code>build/artifact/index.html</code> (with <code>docs/User_Manual.html</code> as a supporting file) to the same artifact URL.</li>
+</ul>
+<h3 id="conventions">Conventions</h3>
+<ul>
+<li>Inputs are in barg, °C, mm and km; the engine works in SI.</li>
+<li>Every number taken from a standard carries a reference tag.</li>
+<li>Any value that could not be confirmed is editable and labelled "verify".</li>
+<li>Interface wording uses plain language.</li>
+</ul>
+<h2 id="11-known-limitations-and-open-items">11. Known limitations and open items</h2>
+<ul>
+<li><strong>Unverified code values.</strong> The values in section 4.3 must be checked against licensed copies, above all the B31.12 Hf table, the IGEM S/T factors and the CSA location factors.</li>
+<li><strong>Compressibility.</strong> Z is within about ±1.5 % of GERG-2008 up to 100 bar. Above that, or for unusual gases, calibrate it.</li>
+<li><strong>Hydraulics</strong> are steady and isothermal. Transients, Joule–Thomson cooling and line-pack dynamics are not modelled.</li>
+<li><strong>Consequence models</strong> ignore wind, terrain, obstacles and crater formation, and use a single point source for radiation. The delayed-ignition explosion estimate depends on assumptions.</li>
+<li><strong>Fatigue</strong> uses flat-plate surface-flaw solutions with bulging. Residual stress and misalignment are not included.</li>
+<li><strong>IGEM and CSA content</strong> comes from public summaries. The CSA Clause 17 "lower of" rule is the tool's interpretation.</li>
+</ul>
+<h2 id="12-suggested-next-steps">12. Suggested next steps</h2>
+<ol>
+<li>Check every value in section 4.3 against your licensed standards and update the defaults.</li>
+<li>Add a second-tier compressibility option (AGA 8 Detail / GERG-2008) for high-pressure work.</li>
+<li>Add DNV-ST-F101/DNV-RP-F123 or EN 1594 / DVGW G 409 bases if those markets matter.</li>
+<li>Add a transient blowdown and pressure-cycling generator for fatigue screening of new designs.</li>
+<li>Add a multi-segment network model for CGD (MP and LP networks with regulators) instead of the Wobbe-proportional capacity estimate.</li>
+<li>Open a pull request once you are satisfied, so the work is merged into the main branch.</li>
+</ol>
+<h2 id="13-change-log">13. Change log</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>8 Oct 2026</td>
+<td>First release: 18 modules, 66 references, 17 verification cases, user manual, hosted copy.</td>
+</tr>
+<tr>
+<td>1.0.1</td>
+<td>8 Oct 2026</td>
+<td>Hosted copy uses the platform downloads capability.</td>
+</tr>
+<tr>
+<td>1.1</td>
+<td>8 Oct 2026</td>
+<td>IGEM/TD/1 Supplement 2 and CSA Z662:23 Clause 17 as design bases; code-requirements and blend-threshold tables; editable IGEM/CSA factors; V18 and V19; references R67–R72; manual v1.1; suite README; this reference document.</td>
+</tr>
+</tbody>
+</table></div></main>
