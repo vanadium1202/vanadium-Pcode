@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>H2 Pipeline Suite User Manual</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono&display=swap">
+<style>
+/* Manual: single reading column with a contents rail; same palette as the tool. */
+:root { --bg:#f7f9f8; --surface:#ffffff; --ink:#15211d; --muted:#586862; --line:#d3dbd7; --accent:#0b6b66; --soft:#dcefec; --warn:#9a5b00; --warn-bg:#fdf0d8;
+  --body:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; --head:'IBM Plex Sans Condensed','Arial Narrow',system-ui,sans-serif; --mono:'IBM Plex Mono',Consolas,Menlo,monospace; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0e1412; --surface:#161f1c; --ink:#e4ebe8; --muted:#9db0a9; --line:#2b3934; --accent:#3cb7ad; --soft:#173b37; --warn:#f2b453; --warn-bg:#3a2c12; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg:#0e1412; --surface:#161f1c; --ink:#e4ebe8; --muted:#9db0a9; --line:#2b3934; --accent:#3cb7ad; --soft:#173b37; --warn:#f2b453; --warn-bg:#3a2c12; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.65 var(--body); }
+.wrap { display:grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+nav.toc { position: sticky; top: 24px; align-self: start; font-size: 13.5px; max-height: calc(100vh - 48px); overflow-y: auto; }
+nav.toc p { font: 600 11px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+nav.toc a { display: block; color: var(--ink); text-decoration: none; padding: 3px 8px; border-left: 2px solid var(--line); }
+nav.toc a:hover { border-color: var(--accent); color: var(--accent); }
+main { min-width: 0; max-width: 76ch; }
+h1, h2, h3 { font-family: var(--head); text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 34px; margin: 0 0 6px; }
+h2 { font-size: 24px; margin: 42px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+h3 { font-size: 18px; margin: 24px 0 6px; }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.lead { color: var(--muted); font-size: 17px; }
+a { color: var(--accent); }
+code, kbd { font-family: var(--mono); font-size: .88em; background: var(--soft); padding: 1px 5px; border-radius: 3px; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; margin: 14px 0; }
+.box.warn { background: var(--warn-bg); border-color: transparent; }
+.box.warn b:first-child { color: var(--warn); }
+ol, ul { padding-left: 22px; } li { margin: 4px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+.tw { overflow-x: auto; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.steps li::marker { color: var(--accent); font-weight: 600; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); padding: 20px 16px 60px; gap: 10px; } nav.toc { position: static; max-height: none; } }
+@media print { nav.toc { display: none; } .wrap { display: block; } h2 { break-before: page; } body { background: #fff; color: #000; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <p>Contents</p>
+  <a href="#start">1. Getting started</a>
+  <a href="#screen">2. The screen</a>
+  <a href="#workflow">3. Typical workflow</a>
+  <a href="#project">4. Project &amp; scenario</a>
+  <a href="#gas">5. Gas properties</a>
+  <a href="#repurpose">6. Repurposing (100 % H2)</a>
+  <a href="#blend">7. Blending in NG pipeline</a>
+  <a href="#design">8. New H2 pipeline design</a>
+  <a href="#cgd">9. CGD blending &amp; Wobbe</a>
+  <a href="#ili">10. ILI &amp; defects</a>
+  <a href="#fatigue">11. Fatigue &amp; fracture</a>
+  <a href="#repair">12. Repair</a>
+  <a href="#ops">13. Operations</a>
+  <a href="#safety">14. Hydrogen safety</a>
+  <a href="#linepipe">15. Line pipe specification</a>
+  <a href="#equipment">16. Instruments &amp; equipment</a>
+  <a href="#files">17. Files, upload &amp; download</a>
+  <a href="#codes">18. Code tables</a>
+  <a href="#verify">19. Verification</a>
+  <a href="#formats">20. File formats</a>
+  <a href="#trouble">21. Troubleshooting</a>
+  <a href="#glossary">22. Glossary</a>
+</nav>
+<main>
+<p class="eyebrow">User manual · version 1.0</p>
+<h1>H2 Pipeline Suite</h1>
+<p class="lead">A workbook for moving hydrogen by pipeline: repurposing natural-gas lines, designing new hydrogen lines, blending hydrogen into natural gas, and blending in city gas networks — with safety, integrity, repair and specification tools.</p>
+<div class="box warn"><b>Please note.</b> This is a screening and option-study tool. Code values (ASME B31.12, B31.8 and others) were transcribed from public sources and can be edited. Check them against your licensed standards. Final design, MAOP and safety decisions need review by a competent engineer.</div>
+
+<h2 id="start">1. Getting started</h2>
+<ol class="steps">
+  <li>Copy <code>H2_Pipeline_Suite.html</code> (and <code>User_Manual.html</code>) to any folder on your laptop.</li>
+  <li>Double-click <code>H2_Pipeline_Suite.html</code>. It opens in your normal browser — Chrome, Edge, Firefox or Safari, on Windows or Mac.</li>
+  <li>That is all. Nothing to install, no internet needed. (With internet the page uses nicer fonts; without it, it uses your system fonts.)</li>
+</ol>
+<p>The tool opens with a complete <b>synthetic example</b> — a 24-inch X52 natural-gas trunkline, 120 km long, MAOP 70 barg — so every module shows results straight away. Replace the example values with your own.</p>
+<p>Your inputs are saved automatically in the browser. To keep them safely, or move them to another computer, use <b>Files &amp; data → Save project</b> (see section 17).</p>
+
+<h2 id="screen">2. The screen</h2>
+<ul>
+  <li><b>Left rail</b> — the list of modules, grouped: Setup, Transport routes, Integrity, Safety, Specifications, Data &amp; QA. On a phone it becomes a drop-down list.</li>
+  <li><b>Top bar</b> — the project title and the theme button (system / light / dark).</li>
+  <li><b>Toolbar</b> under each module title:
+    <ul>
+      <li><b>Fill from project</b> copies the shared pipeline data (diameter, wall, grade, MAOP…) from the Project module.</li>
+      <li><b>Reset inputs</b> returns the module to its example values.</li>
+      <li><b>Export report (.html)</b> and <b>Report for Word (.doc)</b> save the inputs, results and the references used.</li>
+      <li><b>Results table (.csv)</b> saves the main results table for Excel.</li>
+    </ul></li>
+  <li><b>Inputs</b> on the left, <b>results</b> on the right. Results update as you type.</li>
+  <li><b>Status chips</b>: green <i>OK</i>, amber <i>Review</i>, red <i>Fails / not suitable</i>.</li>
+  <li><b>Reference tags</b> such as <code>R2</code> appear next to results. Click one to open the reference list at that source.</li>
+</ul>
+
+<h2 id="workflow">3. Typical workflow</h2>
+<div class="tw"><table>
+<tr><th>Your question</th><th>Modules to use, in order</th></tr>
+<tr><td>Can our existing NG line carry 100 % hydrogen?</td><td>Project → Gas properties → Repurposing → ILI &amp; defects → Fatigue &amp; fracture → Repair → Hydrogen safety</td></tr>
+<tr><td>How much hydrogen can we blend into our NG line, and what does it cost in energy?</td><td>Project → Gas properties → Blending in NG pipeline → Fatigue &amp; fracture (at the blend’s H2 partial pressure) → Hydrogen safety</td></tr>
+<tr><td>We need a new hydrogen pipeline.</td><td>New H2 pipeline design → Line pipe specification → Instruments &amp; equipment → Hydrogen safety</td></tr>
+<tr><td>Blending in a city gas network.</td><td>Gas properties → CGD blending &amp; Wobbe → Hydrogen safety</td></tr>
+</table></div>
+
+<h2 id="project">4. Project &amp; scenario</h2>
+<p>Enter the project title and the <b>existing pipeline</b>: outside diameter, wall thickness, grade, seam type, year, segment length, MAOP, minimum delivery pressure, temperature, location class, roughness and efficiency factor. These are the “shared data” other modules can pull in with <b>Fill from project</b>.</p>
+<p>The results compare the three routes for this line on one table: natural gas today, the blend at the existing MAOP, and 100 % hydrogen after re-rating under ASME B31.12 Option A and Option B. “vs NG” is the energy the line can carry compared with natural gas today.</p>
+
+<h2 id="gas">5. Gas properties</h2>
+<ol class="steps">
+  <li>Pick a <b>preset</b> natural gas (e.g. RLNG typical) or type your own composition in mol %. It does not need to add up to 100 — it is normalised.</li>
+  <li>Set the hydrogen % to study, the line pressure and temperature.</li>
+  <li>Choose the <b>metering reference</b> (15 °C ISO, 0 °C normal m³, or 60 °F) and the <b>energy basis</b> (HHV or LHV). These settings apply to the whole tool.</li>
+</ol>
+<p>You get heating values, Wobbe index, relative density, compressibility Z, density, viscosity, flammability limits and CO₂ per GJ, side by side for natural gas, the blend and pure hydrogen, plus trend charts.</p>
+<p><b>Z calibration multiplier.</b> Z comes from the Peng–Robinson equation with a volume correction; it is within about ±1.5 % of GERG-2008 for 10–100 bar and 0–40 °C. If you have an AGA 8 or GERG value for your gas, set the multiplier so the tool matches it.</p>
+<p>You can import or export the composition as a CSV file (two columns: component, mol %).</p>
+
+<h2 id="repurpose">6. Repurposing an existing pipeline for 100 % hydrogen</h2>
+<p>This module answers two questions: <i>is the steel suitable?</i> and <i>what pressure is allowed?</i></p>
+<h3>Inputs</h3>
+<ul>
+  <li><b>Service &amp; pipe</b> — hydrogen %, dimensions, grade, seam, existing MAOP, location class, design temperature and the B31.12 method: <b>Option A</b> (prescriptive, uses the material performance factor Hf) or <b>Option B</b> (performance-based, needs hydrogen fracture tests).</li>
+  <li><b>Material test data</b> — from mill certificates, field hardness surveys or cut-outs: maximum yield/tensile strength, hardness of base metal and welds, hard spots found by ILI, Charpy energy, DWTT, and K<sub>IH</sub> if tested.</li>
+  <li><b>Chemistry</b> — the tool calculates CE(IIW) and Pcm.</li>
+  <li><b>Condition &amp; history</b> — cracks, dents, metal loss, girth-weld practice, pressure-test ratio, CP potential and pressure cycling.</li>
+</ul>
+<h3>Results</h3>
+<ul>
+  <li><b>MAOP re-rating</b>: B31.8 value for gas, B31.12 Option A (with Hf) and Option B, the derating in %, hydrogen partial pressure and the energy capacity after conversion.</li>
+  <li><b>Screening table</b>: about 20 checks (hardness, hard spots, seam, grade, chemistry, toughness, K<sub>IH</sub>, cracks, dents, girth welds, test record, CP, stress level, cycling) with a status, the criterion, the reference and the action needed.</li>
+  <li><b>Recommended programme</b>: the actions to close every amber and red item before conversion.</li>
+</ul>
+<div class="box"><b>Example.</b> The synthetic 24" × 9.5 mm X52 line at MAOP 70 barg in Class 1 Div 2 re-rates to about 56 barg under Option A (design factor 0.5, Hf = 1), a 20 % derating. Option B allows 70 barg if K<sub>IH</sub> ≥ 55 MPa√m is demonstrated by testing.</div>
+
+<h2 id="blend">7. Blending hydrogen in a natural-gas transmission pipeline</h2>
+<p>Use this to find the energy effects of a blend in an existing line.</p>
+<ul>
+  <li><b>Comparison basis</b>: <i>Same energy delivered</i> (you enter the demand in MW — the tool finds the flow and inlet pressure needed) or <i>Same pressures</i> (the maximum the line can carry).</li>
+  <li><b>Compressor driver</b>: gas turbine (fuel taken from the line) or electric motor, with its efficiency.</li>
+  <li><b>Leakage</b>: your baseline natural-gas leakage as % of throughput and the leak type.</li>
+</ul>
+<p><b>What “energy loss” means here.</b> The energy a compressor station must spend to push the gas through the segment (to restore the pressure drop), divided by the energy delivered. Hydrogen-rich gas needs more volume for the same energy, so compression energy rises with the blend. The tool also shows leakage energy, line-pack energy, outlet velocity against the erosional limit, Wobbe change and the hydrogen partial pressure the steel sees.</p>
+<p>The <b>tolerance table</b> lists typical maximum blend levels for components and end users (pipelines, PE pipe, appliances, meters, gas chromatographs, CNG cylinders, gas turbines, storage), including India’s PNGRB preliminary limits.</p>
+
+<h2 id="design">8. New hydrogen pipeline design</h2>
+<ol class="steps">
+  <li>Enter the <b>duty</b>: hydrogen %, design flow (tonne/day, kg/s, MW or MMSCMD), length, inlet and design pressure, minimum delivery pressure and source (electrolyser/plant) pressure.</li>
+  <li>Enter the <b>mechanical design</b> basis: B31.12 Option A or B, location class, grade, design and minimum temperatures, corrosion allowance, maximum D/t and minimum wall.</li>
+  <li>Enter the <b>hydraulic criteria</b>: roughness, efficiency, maximum velocity. Leave “Force NPS” at 0 to let the tool pick the smallest feasible size.</li>
+</ol>
+<p>The <b>size screening</b> table checks every standard NPS: required and selected wall, outlet pressure, velocity, hoop stress and steel tonnage. The highlighted row is the selected design. Below it you get MAOP, hydrotest pressure, line pack, the Charpy energy needed to arrest a running ductile fracture (Battelle two-curve method), compression power from the source pressure and a pressure profile.</p>
+<p>The selected design is passed automatically to the <b>Line pipe specification</b> and <b>Instruments &amp; equipment</b> modules.</p>
+
+<h2 id="cgd">9. CGD blending &amp; Wobbe index</h2>
+<p>For city gas distribution networks. Choose the hydrogen % and a Wobbe acceptance range (UK GS(M)R, CEN EN 16726, EN 437 family, or your own), and the appliance tolerance band (± % about today’s Wobbe).</p>
+<p><b>Why Wobbe matters.</b> The heat input of a burner at a fixed nozzle and supply pressure is proportional to the Wobbe index. Hydrogen lowers both the heating value and the density, so Wobbe falls more slowly than heating value — about −5 % at 20 % H2 for RLNG.</p>
+<p>Results: Wobbe and its change, heat-input change, extra volume needed for the same energy (important for volumetric billing), network energy capacity, burning velocity (flash-back tendency), CO₂ reduction, the highest blend inside the selected range, a chart with limit lines, and CGD component limits.</p>
+
+<h2 id="ili">10. ILI &amp; defect assessment</h2>
+<ol class="steps">
+  <li>Click <b>Download template</b> to see the column layout, or <b>Load synthetic sample</b> to try it.</li>
+  <li>Prepare your ILI feature list in Excel with the same columns and save as CSV. Click <b>Upload ILI CSV</b>.</li>
+  <li>Set the assessment pressure (the hydrogen MAOP from the Repurposing module) and the design factor.</li>
+</ol>
+<p>Each anomaly is assessed: metal loss by Modified B31G (failure pressure, safe pressure, ERF), cracks by stress-intensity factor against K<sub>IH</sub>, dents against a hydrogen screening limit (2 % OD by default) and the B31.8 rules, hard spots (always repair) and laminations (check for blistering). A summary shows how many need repair before hydrogen service.</p>
+
+<h2 id="fatigue">11. Fatigue &amp; fracture</h2>
+<p>Hydrogen makes cracks grow faster under pressure cycles. This module grows a surface flaw until it reaches the critical size.</p>
+<ul>
+  <li>Enter the flaw (depth and length — e.g. the ILI detection threshold), K<sub>IH</sub>, hydrogen % and the loading.</li>
+  <li><b>Loading</b>: either a simple daily cycle (max/min pressure, cycles per day) or a <b>SCADA pressure history</b>. Upload a CSV of time (hours) and pressure (barg); the tool counts cycles by the rainflow method (ASTM E1049). <b>Generate synthetic history</b> creates a 60-day example.</li>
+  <li>Results: life in hydrogen and in air, allowable life (calculated life ÷ 2), critical flaw depth, re-inspection interval, crack-growth chart and the design curves.</li>
+</ul>
+<p>The hydrogen curves follow ASME Code Case 2938 with an optional pressure correction for the low-ΔK part. The constants are editable in Code tables.</p>
+
+<h2 id="repair">12. Repair of hydrogen pipelines</h2>
+<p>Pick the defect type, hydrogen %, pressure during repair, whether the line is live, wall thickness and defect depth. Enter the steel chemistry, heat input and consumable hydrogen level.</p>
+<p>You get a ranked list of repair methods (recommended / conditional / not recommended) with hydrogen-specific notes, weldability indices, the minimum preheat by EN 1011-2, hardness limits, warnings (e.g. live welding on hydrogen, burn-through risk), and the full method matrix.</p>
+
+<h2 id="ops">13. Operations &amp; integrity</h2>
+<p>For an isolation section between block valves: gas inventory, blowdown time and peak vent rate, energy vented, greenhouse effect of venting, nitrogen purge quantities, and an integrity-management programme comparing natural-gas and hydrogen practice.</p>
+
+<h2 id="safety">14. Hydrogen safety — leak and rupture</h2>
+<ol class="steps">
+  <li>Enter pipe size, operating pressure, temperature and hydrogen % (works for NG, blends and pure hydrogen).</li>
+  <li><b>Leak</b>: hole size (and extra sizes for a sensitivity table), discharge coefficient, radiant fraction (0 = automatic), transmissivity, exposure time and TNT yield.</li>
+  <li><b>Rupture</b>: the full-bore, double-ended case is calculated automatically. The delayed-ignition explosion estimate needs a release time and flammable fraction — these are assumptions, so test a range.</li>
+</ol>
+<h3>What you get</h3>
+<ul>
+  <li>Leak: release rate, flame length, distances to each thermal-radiation level (1.58 to 37.5 kW/m²), distance to LFL and ½ LFL (unignited gas cloud), flammable mass, TNT-equivalent mass, overpressure distances, and 1 % / 50 % fatality distances.</li>
+  <li>Rupture: potential impact radius (PIR) from the model and from the code constant (0.69 for NG, 0.47 for H2), thermal-radiation radii and overpressure distances.</li>
+  <li><b>Safe-zone diagrams</b> for leak and rupture, and a table of hydrogen hazard properties.</li>
+</ul>
+<div class="box"><b>Using the zones.</b> A common approach: emergency exclusion at the 4.73 kW/m² contour (people can escape), public evacuation to 1.58 kW/m², no ignition sources inside ½ LFL. Wind, terrain and buildings are not modelled — use detailed software (e.g. HyRAM+, PHAST) for the final safety study.</div>
+
+<h2 id="linepipe">15. Line pipe specification</h2>
+<p>Creates a purchase specification for new hydrogen line pipe, supplementary to API 5L / ISO 3183 PSL2. Defaults come from the New H2 pipeline design. Edit any requirement:</p>
+<ul>
+  <li>Pipe data, manufacturing process and steel processing route.</li>
+  <li>Chemistry limits (C, Mn, P, S, micro-alloys, CE(IIW), Pcm).</li>
+  <li>Mechanical limits: Y/T, maximum yield, hardness (≤ 250 HV10 body, ≤ 235 HV10 weld/HAZ), Charpy, DWTT.</li>
+  <li>Hydrogen qualification tests: K<sub>IH</sub>, fatigue crack growth and J-R in hydrogen, HIC test, microstructure.</li>
+  <li>Coatings.</li>
+</ul>
+<p>A consistency check flags conflicts (e.g. Charpy lower than the fracture-arrest requirement). Export the specification as HTML or as a Word file (.doc), then finish it in Word.</p>
+
+<h2 id="equipment">16. Instruments &amp; equipment</h2>
+<p>Choose an item from the list: mainline valve, PSV, compressor, ultrasonic meter, gas chromatograph, pressure transmitter, gas detector, flame detector, pig trap, insulating joint, cathodic protection, odorisation, seals, hazardous-area electrical equipment, leak detection. Each datasheet is filled from the design and every line is editable. Hydrogen-specific requirements and the standards are listed.</p>
+<p>For the <b>PSV</b>, the tool sizes the orifice by API 520 (gas, critical flow) and selects the API 526 letter. Export one datasheet or the full package (HTML or Word).</p>
+
+<h2 id="files">17. Files, upload and download</h2>
+<h3>Project file</h3>
+<ul>
+  <li><b>Save project (.json)</b> — everything: all module inputs, composition, ILI listing, pressure history and code tables. Tick “Include document-library files” to pack your documents too.</li>
+  <li><b>Open project</b> — loads a saved file (on any computer).</li>
+  <li><b>New project</b> — clears inputs (asks you to confirm).</li>
+</ul>
+<h3>Templates and exports</h3>
+<p>Templates for ILI listings, pressure histories and compositions; code tables as JSON; and “All module results (.csv)” — one CSV with every module’s main table.</p>
+<h3>Document library</h3>
+<p>Add any files (PDF, Excel, images, drawings…) with a note and the module they relate to. They are stored in this browser on this computer. Download or remove them at any time.</p>
+<div class="box">If you open the tool inside a viewer that blocks downloads (for example an embedded web page), a message offers <b>Copy content</b>: paste it into Notepad or TextEdit and save with the file name shown. Opening the HTML file directly from your disk has no such limit.</div>
+
+<h2 id="codes">18. Code tables</h2>
+<p>All code values used by the calculations are here and editable: the B31.12 Hf table, design factors by location class (B31.8, B31.12 Option A and B), hydrotest ratios, screening limits (hardness, CE, S, P, Charpy, K<sub>IH</sub>, stress levels, dent limits, CP limit), fatigue-crack-growth constants and rupture-fire parameters. Changes apply immediately to every module and are saved with the project. <b>Reset all tables</b> restores the defaults.</p>
+
+<h2 id="verify">19. Verification</h2>
+<p>The Verification module runs 17 test cases against published values (ISO 6976, EN 437 test gases, API 520 example, ASTM E1049 example, ASME B31.8S and B31.12 PIR constants) and an independent Python calculation (with GERG-2008 compressibility). All pass at the stated tolerances. Re-run it after editing code tables.</p>
+
+<h2 id="formats">20. File formats</h2>
+<div class="tw"><table>
+<tr><th>File</th><th>Columns / content</th><th>Example row</th></tr>
+<tr><td>ILI listing (.csv)</td><td><code>id, chainage_m, type, depth_pct, length_mm, width_mm, dent_pct, at_weld, clock</code>. Type = ML (metal loss), CRACK, DENT, HS (hard spot), LAM (lamination).</td><td><code>A002,4820,ML,41,160,90,,N,05:30</code></td></tr>
+<tr><td>Pressure history (.csv)</td><td><code>time_h, pressure_barg</code> — or an ISO date-time and pressure.</td><td><code>12,57.4</code> or <code>2025-03-01T12:00,57.4</code></td></tr>
+<tr><td>Gas composition (.csv)</td><td><code>component, mol_pct</code>; components CH4, C2H6, C3H8, iC4, nC4, nC5, N2, CO2, H2, O2, He, CO, H2S</td><td><code>CH4,92.1</code></td></tr>
+<tr><td>Project (.json)</td><td>Saved by the tool; do not edit by hand.</td><td>—</td></tr>
+</table></div>
+<p>Comma, semicolon or tab separators are accepted, so CSVs saved from Excel in any regional setting work.</p>
+
+<h2 id="trouble">21. Troubleshooting</h2>
+<div class="tw"><table>
+<tr><th>Problem</th><th>What to do</th></tr>
+<tr><td>“Calculation could not be completed”</td><td>An input is zero, negative or unrealistic (e.g. wall thickness 0, minimum pressure above inlet). Correct it, or press Reset inputs.</td></tr>
+<tr><td>“infeasible” in the size table</td><td>The pressure drop is too large for that size at the design flow; a larger size is needed.</td></tr>
+<tr><td>Hf shows “—”</td><td>The pressure or grade is outside the Hf table (above 3000 psig or above X80). Use Option B or extend the table in Code tables.</td></tr>
+<tr><td>My inputs disappeared</td><td>Browser data was cleared, or you opened the file in a different browser. Always keep a saved project file.</td></tr>
+<tr><td>Upload did nothing</td><td>Check the file is CSV (not .xlsx) and has the expected columns; see section 20.</td></tr>
+</table></div>
+
+<h2 id="glossary">22. Glossary</h2>
+<div class="tw"><table>
+<tr><td><b>BTCM</b></td><td>Battelle two-curve method — checks whether a running ductile fracture will arrest.</td></tr>
+<tr><td><b>CC2938</b></td><td>ASME Code Case giving fatigue-crack-growth design curves for steels in hydrogen.</td></tr>
+<tr><td><b>ERF</b></td><td>Estimated repair factor = operating pressure ÷ safe pressure. ≥ 1 means repair.</td></tr>
+<tr><td><b>Hf</b></td><td>Material performance factor in ASME B31.12 Option A; reduces allowable stress for higher grades and pressures.</td></tr>
+<tr><td><b>K<sub>IH</sub></b></td><td>Threshold stress-intensity factor for hydrogen-assisted cracking, measured in hydrogen gas.</td></tr>
+<tr><td><b>LFL</b></td><td>Lower flammability limit (4 % for hydrogen, 5 % for methane).</td></tr>
+<tr><td><b>PIR</b></td><td>Potential impact radius — distance at which a rupture fire gives 15.8 kW/m².</td></tr>
+<tr><td><b>pH2</b></td><td>Hydrogen partial pressure = total pressure × hydrogen fraction.</td></tr>
+<tr><td><b>Wobbe index</b></td><td>Heating value ÷ √(relative density); measures interchangeability of gases in burners.</td></tr>
+</table></div>
+<p style="margin-top:40px;color:var(--muted);font-size:13px">H2 Pipeline Suite v1.0 — screening-level engineering tool. References for every method are listed in the tool under Data &amp; QA → References.</p>
+</main>
+</div>
+</body>
+</html>

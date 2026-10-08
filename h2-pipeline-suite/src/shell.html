@@ -1,0 +1,21 @@
+<title>H2 Pipeline Suite</title>
+<meta name="description" content="Engineering workbook for hydrogen pipeline transport: repurposing, new H2 pipelines, NG blending, CGD Wobbe, safety, specifications.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style id="app-css">/*CSS*/</style>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="mark" aria-hidden="true">H<sub>2</sub></span><div><b>H2 Pipeline Suite</b><small>Transport · integrity · safety</small></div></div>
+    <label class="navsel-l" for="navSel">Module</label>
+    <select id="navSel" class="navsel"></select>
+    <nav id="nav" aria-label="Modules"></nav>
+    <p class="side-foot">Screening-level tool. Verify code values against licensed standards. <a href="User_Manual.html" target="_blank" rel="noopener">User manual</a></p>
+  </aside>
+  <div class="content">
+    <div class="topbar"><p class="proj"><span>Project</span> <b id="projTitle"></b></p><button class="btn sm ghost" type="button" id="themeBtn">Theme</button></div>
+    <main id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div id="toasts" class="toasts" role="status"></div>
+<div id="copyDlg" class="dlg" hidden><div class="dlg-in"><h3>Copy the file content</h3><p class="note">This viewer blocked the download. Select all and copy, then paste into a text editor and save with the file name shown.</p><textarea id="copyArea" rows="14" aria-label="File content"></textarea><button class="btn" type="button" id="copyClose">Close</button></div></div>
+<script>/*JS*/</script>
