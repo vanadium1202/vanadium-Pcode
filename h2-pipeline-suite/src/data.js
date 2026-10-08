@@ -12,7 +12,7 @@
     R2: ['ASME B31.12-2023', 'Hydrogen Piping and Pipelines, Part PL & Mandatory Appendix IX', 'Option A (prescriptive) / Option B (performance-based) design, design factors, material performance factor Hf (Table IX-5A), weld hardness 235 HV10, KIH ≥ 55 MPa√m for Option B'],
     R3: ['EIGA Doc 121/14 (CGA G-5.6)', 'Hydrogen Pipeline Systems', 'Material guidance: max hardness ≈ 250 HB (22 HRC), CE ≤ 0.43, preference for ≤ X52/L360, normalised steels; scope 1–21 MPa, −40 to 175 °C'],
     R4: ['API Spec 5L (46th ed. 2018; 47th ed. 2026) / ISO 3183:2019', 'Line Pipe', 'PSL2 requirements, Annex H (sour-service style chemistry & hardness ≤ 250 HV10 used as a baseline by hydrogen line-pipe specifications), Annex G fracture propagation'],
-    R5: ['IGEM/TD/1 Ed. 6, Supplement 2', 'High pressure hydrogen pipelines (UK)', 'Hydrogen-specific design, fatigue and fracture requirements for repurposing and new pipelines'],
+    R5: ['IGEM/TD/1 Ed. 6, Supplement 2 (2021)', 'High pressure hydrogen pipelines (UK)', 'Based on ASME B31.12; design factor capped at 0.5 with B31.12 Hf for grades above L360 (pressures ≤ 137.9 barg); blends > 10 mol % H2 treated as 100 % H2; fracture-toughness testing in H2 (S5.3.4); repurposing procedure'],
     R6: ['ASME B31.8S-2022', 'Managing System Integrity of Gas Pipelines', 'Potential impact radius r = 0.69·d·√p (ft, in, psi); 15.8 kW/m² threshold; HCA definition'],
     R7: ['Stephens M.J. (2000), GRI-00/0189', 'A Model for Sizing High Consequence Areas Associated with Natural Gas Pipelines (C-FER)', 'Rupture fire model: release-rate decay 0.33, Cd 0.62, combustion efficiency 0.35, emissivity 0.2'],
     R8: ['PHMSA R&D (2025) Quarterly Report 2', 'PIR in Blended H2-NG Pipelines', 'Industry PIR constants: 0.47 hydrogen, 0.69 lean NG, 0.73 rich NG (ft, in, psi)'],
@@ -73,7 +73,13 @@
     R63: ['IEC 60534 / ISA-75.01', 'Industrial-process control valves', 'Control valve sizing'],
     R64: ['ISO 13623:2017', 'Pipeline transportation systems', 'General pipeline design principles, velocity and integrity guidance'],
     R65: ['IPCC AR6 WG1 (2021) Ch. 7', 'Global warming potentials', 'GWP100 of fossil methane = 29.8'],
-    R66: ['Sand M. et al. (2023)', 'A multi-model assessment of the Global Warming Potential of hydrogen, Commun. Earth Environ. 4:203', 'Indirect GWP100 of hydrogen ≈ 11.6 ± 2.8']
+    R66: ['Sand M. et al. (2023)', 'A multi-model assessment of the Global Warming Potential of hydrogen, Commun. Earth Environ. 4:203', 'Indirect GWP100 of hydrogen ≈ 11.6 ± 2.8'],
+    R67: ['Cosham A. et al. (2022), IChemE Hazards 32 Paper 01', 'The development of supplements to IGEM/TD/1 Edition 6 for hydrogen pipelines', 'Background to Supplements 1 & 2: 0.5 design-factor cap, Hf, qualification testing'],
+    R68: ['EPRG (2023)', 'Hydrogen Pipelines — Integrity Management and Repurposing Guideline', 'Suggests relaxing B31.12 weld hardness to 275 HV10 average / 300 HV10 maximum (limited data; confirm with authority)'],
+    R69: ['CSA Z662:23 (9th ed.)', 'Oil and gas pipeline systems — new Clause 17 Hydrogen and hydrogen-blend pipeline systems', 'Engineering assessment of materials, design and operation for H2 and blends; ASME B31.12 referenced as guidance; design pressure P = 2St/D·F·L·J·T (F = 0.8)'],
+    R70: ['CSA Group Research (2023)', 'Assessment of Natural Gas Pipeline Materials for Hydrogen Service', 'Applies B31.12 Hf (Table IX-5A) below 2 000 psig; susceptibility factors (grade, hardness, pH2, welds)'],
+    R71: ['Alberta Utilities Commission (2022)', 'Hydrogen Inquiry — Final Report', 'Recommended max 20 % by volume blending in distribution systems, starting with lower-level pilots'],
+    R72: ['Innovate UK / NRCan / US (2022)', 'Hydrogen Blending Standards: UK–Canada–US knowledge sharing', 'Comparison of blending limits (e.g. UK 2 % transmission / 20 % distribution trials)']
   };
 
   /* ---- Code tables (defaults; editable in the app) ---- */
@@ -95,10 +101,13 @@
     F_A: [0.50, 0.50, 0.50, 0.40, 0.40],      // B31.12 Option A (prescriptive)
     F_B: [0.72, 0.72, 0.60, 0.50, 0.40],      // B31.12 Option B (performance-based)
     hydro: [1.25, 1.10, 1.25, 1.40, 1.40],    // B31.8 Table 841.3.2-1 minimum test / MAOP
+    F_IGEM: [0.50, 0.50, 0.30, 0.30, 0.30],   // IGEM/TD/1 Supp 2 cap 0.5 (Class R); S/T classes 0.3 — mapping Class 1→R, 2→S, 3/4→T (verify)
+    L_CSA: [1.00, 1.00, 0.90, 0.70, 0.55],    // CSA Z662 location factor L (gas, general) by class 1/1/2/3/4 (verify)
     limits: {
       hvBase: 250, hvWeld: 235, hvHardSpot: 345, ceIIW: 0.43, pcm: 0.22, S: 0.010, P: 0.015,
       cvnMin: 40, cvnRed: 27, kih: 55, smysA: 70, smysB: 80, utsA: 100, utsB: 110,
-      stressLow: 30, stressHigh: 50, dentH2: 2.0, dentB318: 6.0, cpLimit: -1.2
+      stressLow: 30, stressHigh: 50, dentH2: 2.0, dentB318: 6.0, cpLimit: -1.2,
+      F_CSA: 0.8, igemBlend: 10, hvWeldEPRG: 275, hvWeldEPRGmax: 300, ceIGEM: 0.43
     },
     fcg: { CL: 3.5e-14, mL: 6.5, rL: 0.4286, CH: 1.5e-11, mH: 3.66, rH: 2.0, pRef: 106, airC: 5.21e-13, airM: 3.0, lifeFactor: 2 },
     pir: { XgNG: 0.20, XgH2: 0.11, eta: 0.35, lambda: 0.33, Cd: 0.62, ends: 2 },
@@ -269,6 +278,31 @@
       h2: ['H2 leaks have ~2.8× higher volumetric rate than CH4 through the same hole (choked) — energy loss similar, gas inventory falls faster.'] }
   ];
 
-  root.H2D = { REFS, DEFAULT_TABLES, GRADES, PIPE_OD, WALLS, GASES, SEAMS, TOLERANCE, WOBBE_STD, SL_TABLE, REPAIR_METHODS, REPAIR_MATRIX, EQUIP };
+  /* ---- Code requirement matrix: ASME B31.12 vs IGEM/TD/1 Supp 2 vs CSA Z662:23 Cl. 17 vs EIGA ---- */
+  const CODES = [
+    { k: 'A', l: 'ASME B31.12 Option A', ref: 'R2' }, { k: 'B', l: 'ASME B31.12 Option B', ref: 'R2' },
+    { k: 'IGEM', l: 'IGEM/TD/1 Ed. 6 Supplement 2', ref: 'R5' }, { k: 'CSA', l: 'CSA Z662:23 Clause 17', ref: 'R69' }
+  ];
+  const CODE_REQS = [
+    { req: 'Scope / blend threshold', b31: 'Hydrogen and hydrogen mixtures (Part PL)', igem: 'Blends > 10 mol % H2 treated as 100 % H2', csa: 'Hydrogen and hydrogen-blend systems (any H2 content)', eiga: 'Pure H2 and mixtures, 1–21 MPa' },
+    { req: 'Maximum design factor', b31: 'Option A 0.5 × Hf; Option B 0.72', igem: '0.5 cap, × Hf for grades above L360; higher only with qualification testing', csa: 'Z662 F·L (0.8 × location factor) subject to engineering assessment; B31.12 cited as guidance', eiga: 'Per national code; low hoop stress recommended' },
+    { req: 'Material performance factor', b31: 'Hf from Table IX-5A (Option A)', igem: 'B31.12 Hf for grades above L360, pressures ≤ 137.9 barg', csa: 'Not prescribed — engineering assessment', eiga: '—' },
+    { req: 'Weld / HAZ hardness', b31: '≤ 235 HV10', igem: 'Per Supplement 2 (verify); EPRG suggests 275 HV10 avg / 300 max', csa: 'Engineering assessment', eiga: '≈ 250 HB (22 HRC)' },
+    { req: 'Carbon equivalent / chemistry', b31: 'Option B: P ≤ 0.015 %, inclusion-shape control', igem: 'CE ≤ 0.43 (UK practice)', csa: 'Engineering assessment', eiga: 'CE ≤ 0.43; S, P limits' },
+    { req: 'Fracture toughness in H2', b31: 'Option B: KIH ≥ 55 MPa√m (ASME VIII-3 KD-10)', igem: 'Fracture-toughness testing in H2 required (S5.3.4)', csa: 'Assess toughness reduction in H2', eiga: '—' },
+    { req: 'Fatigue', b31: 'Fatigue crack growth in H2 (KD-10 / Code Case 2938 basis)', igem: 'Fatigue-crack-growth assessment in H2', csa: 'Assess pressure cycling in H2', eiga: '—' },
+    { req: 'Repurposing existing lines', b31: 'Requalify to Option A or B', igem: 'Repurposing procedure included', csa: 'Lifecycle engineering assessment for conversions', eiga: '—' }
+  ];
+  /* ---- Regulatory / code blend thresholds (mol % H2) ---- */
+  const BLEND_RULES = [
+    { c: 'IGEM/TD/1 Supp 2 (UK high-pressure)', lim: 10, above: 'Treated as 100 % H2 — full Supplement 2 requirements', below: 'At or below 10 mol % — check the Supplement 2 blend provisions', src: 'R5, R67' },
+    { c: 'CSA Z662:23 Clause 17 (Canada)', lim: 0, above: 'Clause 17 applies — engineering assessment of materials, design and operation', below: 'No hydrogen — Clause 17 not triggered', src: 'R69' },
+    { c: 'ASME B31.12 (US)', lim: 0, above: 'Hydrogen service — B31.12 Part PL design / qualification', below: 'Natural gas — ASME B31.8', src: 'R2' },
+    { c: 'UK GS(M)R gas quality', lim: 0.1, above: 'Above the 0.1 mol % H2 limit — needs exemption or regulatory change', below: 'Within the GS(M)R limit', src: 'R36, R72' },
+    { c: 'Alberta AUC recommendation (distribution)', lim: 20, above: 'Above the 20 vol % recommended maximum', below: 'Within the 20 vol % recommendation (start with lower-level pilots)', src: 'R71' },
+    { c: 'India PNGRB preliminary (CGD pipelines ≤ X52)', lim: 10, above: 'Above the 10 % preliminary limit', below: 'Within the preliminary limit', src: 'R37' }
+  ];
+
+  root.H2D = { CODES, CODE_REQS, BLEND_RULES, REFS, DEFAULT_TABLES, GRADES, PIPE_OD, WALLS, GASES, SEAMS, TOLERANCE, WOBBE_STD, SL_TABLE, REPAIR_METHODS, REPAIR_MATRIX, EQUIP };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.H2D;
 })(typeof window !== 'undefined' ? window : globalThis);

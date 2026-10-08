@@ -539,6 +539,27 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     return { P: lo, Hf: hfLookup(table, smts, lo).hf, P0 };
   }
 
+  /* ---------- design basis by code [R2 B31.12, R5 IGEM/TD/1 Supp 2, R69 CSA Z662 Cl. 17] ----------
+     Returns the effective factor (F × Hf, or F × L for CSA) applied to 2·S·t/D·E·T at pressure p (MPa).
+     IGEM: 0.5-capped design factor with B31.12 Hf only for grades above L360.
+     CSA: Clause 17 requires an engineering assessment; the tool takes the LOWER of the Z662 design
+          factor (F·L) and the B31.12 Option A factor that Z662 cites as guidance (tool interpretation). */
+  function codeFactor(code, t, loc, smys, smts, pMPa) {
+    const hf = () => { const h = hfLookup(t.hf, smts, pMPa).hf; return isNaN(h) ? NaN : h; };
+    if (code === 'B') return { F: t.F_B[loc], Hf: 1, eff: t.F_B[loc] };
+    if (code === 'IGEM') { const F = t.F_IGEM[loc]; const H = smys > 361 ? hf() : 1; return { F, Hf: H, eff: F * H }; }
+    if (code === 'CSA') { const fl = t.limits.F_CSA * t.L_CSA[loc]; const a = t.F_A[loc] * hf(); return { F: fl, Hf: 1, eff: Math.min(fl, a), csaFL: fl, b3112: a, governs: a < fl ? 'B31.12 Option A' : 'Z662 F·L' }; }
+    const H = hf(); return { F: t.F_A[loc], Hf: H, eff: t.F_A[loc] * H };
+  }
+  // allowable design pressure (MPa) solving P = 2·S·t/D·E·T·eff(P)
+  function codeAllowP(code, t, o) { // o: {loc, smys, smts, t (mm), D (mm), E, T}
+    const P0 = 2 * o.smys * o.t / o.D * (o.E ?? 1) * (o.T ?? 1);
+    const g = P => { const e = codeFactor(code, t, o.loc, o.smys, o.smts, P).eff; return isNaN(e) ? -1 : P0 * e - P; };
+    let lo = 0, hi = P0; for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (g(m) >= 0) lo = m; else hi = m; }
+    const f = codeFactor(code, t, o.loc, o.smys, o.smts, lo);
+    return { P: lo, ...f };
+  }
+
   /* ---------- metal loss: Modified B31G (0.85dL) [R10] ---------- */
   function modB31G(o) { // {D, t, d, L (mm), SMYS MPa}
     const Sflow = o.SMYS + 68.95; const z = o.L * o.L / (o.D * o.t);
@@ -814,12 +835,14 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     add('V16', 'EN 1011-2 preheat, CET 0.30, 20 mm, HD 5, Q 1.0 kJ/mm', 'R30', preheatEN1011({ CET: 0.30, d: 20, HD: 5, Q: 1.0 }), 56.53, 0.1, '°C', 'Hand calculation of EN 1011-2 Annex C Eq. C.5');
     const pf = pipeFlow({ c: ch4, D: 0.5906, L: 100e3, p1: 70e5 + PATM, p2: 50e5 + PATM, T: 288.15, rough: 4.57e-5, E: 1 });
     add('V17', 'General flow eq. 24" pipe, 100 km, 70→50 barg CH4 (mass flow)', 'R45', pf.mdot, 84.09, 2.0, 'kg/s', 'Independent Python solver with GERG-2008 Z (tests/hand_calcs.py)');
+    add('V18', 'IGEM/TD/1 Supp 2 allowable, 610 × 9.5 mm L360, Class R (F = 0.5)', 'R5', codeAllowP('IGEM', tables, { loc: 0, smys: 360, smts: 460, t: 9.5, D: 610 }).P, 5.6066, 0.1, 'MPa', 'Hand calculation 2·360·9.5/610·0.5 (Hf not applied ≤ L360)');
+    add('V19', 'CSA Z662 F·L, 610 × 9.5 mm X52, Class 1 (0.8 × 1.0)', 'R69', barlowP(360, 9.5, 610, tables.limits.F_CSA * tables.L_CSA[0]), 8.9705, 0.1, 'MPa', 'Hand calculation 2·360·9.5/610·0.8');
     return out;
   }
 
   const api = { zCorr, RU, PATM, G, M_AIR, COMP, KEYS, normalize, blend, molarMass, isoProps, zStd, cpR, gammaIdeal, prZ, viscMix, viscPure, state,
     flammability, co2PerGJ, colebrook, pAvg, pipeFlow, pipeOutlet, pipeInlet, compressor, linepack, energyMW, mdotFromMW, stdFlow,
-    chokedMassFlux, leakRatios, barlowP, tempDerating, hfLookup, b3112OptionA, modB31G, newmanRaju, bulging, crackK, fcgr, FCG_DEFAULT,
+    chokedMassFlux, leakRatios, barlowP, tempDerating, hfLookup, b3112OptionA, codeFactor, codeAllowP, modB31G, newmanRaju, bulging, crackK, fcgr, FCG_DEFAULT,
     crackGrowth, criticalDepth, reversals, rainflow, decompressionSpeed, btcm, release, flameLength, defaultXr, pointSourceDistance,
     jetLFLDistance, jetFlammableMass, millsOverpressure, distanceForOverpressure, pir, probitFatality, normCdf, blowdown, psvArea, API526,
     cet, ceIIW, pcm, preheatEN1011, verificationCases };
@@ -840,7 +863,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     R2: ['ASME B31.12-2023', 'Hydrogen Piping and Pipelines, Part PL & Mandatory Appendix IX', 'Option A (prescriptive) / Option B (performance-based) design, design factors, material performance factor Hf (Table IX-5A), weld hardness 235 HV10, KIH ≥ 55 MPa√m for Option B'],
     R3: ['EIGA Doc 121/14 (CGA G-5.6)', 'Hydrogen Pipeline Systems', 'Material guidance: max hardness ≈ 250 HB (22 HRC), CE ≤ 0.43, preference for ≤ X52/L360, normalised steels; scope 1–21 MPa, −40 to 175 °C'],
     R4: ['API Spec 5L (46th ed. 2018; 47th ed. 2026) / ISO 3183:2019', 'Line Pipe', 'PSL2 requirements, Annex H (sour-service style chemistry & hardness ≤ 250 HV10 used as a baseline by hydrogen line-pipe specifications), Annex G fracture propagation'],
-    R5: ['IGEM/TD/1 Ed. 6, Supplement 2', 'High pressure hydrogen pipelines (UK)', 'Hydrogen-specific design, fatigue and fracture requirements for repurposing and new pipelines'],
+    R5: ['IGEM/TD/1 Ed. 6, Supplement 2 (2021)', 'High pressure hydrogen pipelines (UK)', 'Based on ASME B31.12; design factor capped at 0.5 with B31.12 Hf for grades above L360 (pressures ≤ 137.9 barg); blends > 10 mol % H2 treated as 100 % H2; fracture-toughness testing in H2 (S5.3.4); repurposing procedure'],
     R6: ['ASME B31.8S-2022', 'Managing System Integrity of Gas Pipelines', 'Potential impact radius r = 0.69·d·√p (ft, in, psi); 15.8 kW/m² threshold; HCA definition'],
     R7: ['Stephens M.J. (2000), GRI-00/0189', 'A Model for Sizing High Consequence Areas Associated with Natural Gas Pipelines (C-FER)', 'Rupture fire model: release-rate decay 0.33, Cd 0.62, combustion efficiency 0.35, emissivity 0.2'],
     R8: ['PHMSA R&D (2025) Quarterly Report 2', 'PIR in Blended H2-NG Pipelines', 'Industry PIR constants: 0.47 hydrogen, 0.69 lean NG, 0.73 rich NG (ft, in, psi)'],
@@ -901,7 +924,13 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     R63: ['IEC 60534 / ISA-75.01', 'Industrial-process control valves', 'Control valve sizing'],
     R64: ['ISO 13623:2017', 'Pipeline transportation systems', 'General pipeline design principles, velocity and integrity guidance'],
     R65: ['IPCC AR6 WG1 (2021) Ch. 7', 'Global warming potentials', 'GWP100 of fossil methane = 29.8'],
-    R66: ['Sand M. et al. (2023)', 'A multi-model assessment of the Global Warming Potential of hydrogen, Commun. Earth Environ. 4:203', 'Indirect GWP100 of hydrogen ≈ 11.6 ± 2.8']
+    R66: ['Sand M. et al. (2023)', 'A multi-model assessment of the Global Warming Potential of hydrogen, Commun. Earth Environ. 4:203', 'Indirect GWP100 of hydrogen ≈ 11.6 ± 2.8'],
+    R67: ['Cosham A. et al. (2022), IChemE Hazards 32 Paper 01', 'The development of supplements to IGEM/TD/1 Edition 6 for hydrogen pipelines', 'Background to Supplements 1 & 2: 0.5 design-factor cap, Hf, qualification testing'],
+    R68: ['EPRG (2023)', 'Hydrogen Pipelines — Integrity Management and Repurposing Guideline', 'Suggests relaxing B31.12 weld hardness to 275 HV10 average / 300 HV10 maximum (limited data; confirm with authority)'],
+    R69: ['CSA Z662:23 (9th ed.)', 'Oil and gas pipeline systems — new Clause 17 Hydrogen and hydrogen-blend pipeline systems', 'Engineering assessment of materials, design and operation for H2 and blends; ASME B31.12 referenced as guidance; design pressure P = 2St/D·F·L·J·T (F = 0.8)'],
+    R70: ['CSA Group Research (2023)', 'Assessment of Natural Gas Pipeline Materials for Hydrogen Service', 'Applies B31.12 Hf (Table IX-5A) below 2 000 psig; susceptibility factors (grade, hardness, pH2, welds)'],
+    R71: ['Alberta Utilities Commission (2022)', 'Hydrogen Inquiry — Final Report', 'Recommended max 20 % by volume blending in distribution systems, starting with lower-level pilots'],
+    R72: ['Innovate UK / NRCan / US (2022)', 'Hydrogen Blending Standards: UK–Canada–US knowledge sharing', 'Comparison of blending limits (e.g. UK 2 % transmission / 20 % distribution trials)']
   };
 
   /* ---- Code tables (defaults; editable in the app) ---- */
@@ -923,10 +952,13 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     F_A: [0.50, 0.50, 0.50, 0.40, 0.40],      // B31.12 Option A (prescriptive)
     F_B: [0.72, 0.72, 0.60, 0.50, 0.40],      // B31.12 Option B (performance-based)
     hydro: [1.25, 1.10, 1.25, 1.40, 1.40],    // B31.8 Table 841.3.2-1 minimum test / MAOP
+    F_IGEM: [0.50, 0.50, 0.30, 0.30, 0.30],   // IGEM/TD/1 Supp 2 cap 0.5 (Class R); S/T classes 0.3 — mapping Class 1→R, 2→S, 3/4→T (verify)
+    L_CSA: [1.00, 1.00, 0.90, 0.70, 0.55],    // CSA Z662 location factor L (gas, general) by class 1/1/2/3/4 (verify)
     limits: {
       hvBase: 250, hvWeld: 235, hvHardSpot: 345, ceIIW: 0.43, pcm: 0.22, S: 0.010, P: 0.015,
       cvnMin: 40, cvnRed: 27, kih: 55, smysA: 70, smysB: 80, utsA: 100, utsB: 110,
-      stressLow: 30, stressHigh: 50, dentH2: 2.0, dentB318: 6.0, cpLimit: -1.2
+      stressLow: 30, stressHigh: 50, dentH2: 2.0, dentB318: 6.0, cpLimit: -1.2,
+      F_CSA: 0.8, igemBlend: 10, hvWeldEPRG: 275, hvWeldEPRGmax: 300, ceIGEM: 0.43
     },
     fcg: { CL: 3.5e-14, mL: 6.5, rL: 0.4286, CH: 1.5e-11, mH: 3.66, rH: 2.0, pRef: 106, airC: 5.21e-13, airM: 3.0, lifeFactor: 2 },
     pir: { XgNG: 0.20, XgH2: 0.11, eta: 0.35, lambda: 0.33, Cd: 0.62, ends: 2 },
@@ -1097,7 +1129,32 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       h2: ['H2 leaks have ~2.8× higher volumetric rate than CH4 through the same hole (choked) — energy loss similar, gas inventory falls faster.'] }
   ];
 
-  root.H2D = { REFS, DEFAULT_TABLES, GRADES, PIPE_OD, WALLS, GASES, SEAMS, TOLERANCE, WOBBE_STD, SL_TABLE, REPAIR_METHODS, REPAIR_MATRIX, EQUIP };
+  /* ---- Code requirement matrix: ASME B31.12 vs IGEM/TD/1 Supp 2 vs CSA Z662:23 Cl. 17 vs EIGA ---- */
+  const CODES = [
+    { k: 'A', l: 'ASME B31.12 Option A', ref: 'R2' }, { k: 'B', l: 'ASME B31.12 Option B', ref: 'R2' },
+    { k: 'IGEM', l: 'IGEM/TD/1 Ed. 6 Supplement 2', ref: 'R5' }, { k: 'CSA', l: 'CSA Z662:23 Clause 17', ref: 'R69' }
+  ];
+  const CODE_REQS = [
+    { req: 'Scope / blend threshold', b31: 'Hydrogen and hydrogen mixtures (Part PL)', igem: 'Blends > 10 mol % H2 treated as 100 % H2', csa: 'Hydrogen and hydrogen-blend systems (any H2 content)', eiga: 'Pure H2 and mixtures, 1–21 MPa' },
+    { req: 'Maximum design factor', b31: 'Option A 0.5 × Hf; Option B 0.72', igem: '0.5 cap, × Hf for grades above L360; higher only with qualification testing', csa: 'Z662 F·L (0.8 × location factor) subject to engineering assessment; B31.12 cited as guidance', eiga: 'Per national code; low hoop stress recommended' },
+    { req: 'Material performance factor', b31: 'Hf from Table IX-5A (Option A)', igem: 'B31.12 Hf for grades above L360, pressures ≤ 137.9 barg', csa: 'Not prescribed — engineering assessment', eiga: '—' },
+    { req: 'Weld / HAZ hardness', b31: '≤ 235 HV10', igem: 'Per Supplement 2 (verify); EPRG suggests 275 HV10 avg / 300 max', csa: 'Engineering assessment', eiga: '≈ 250 HB (22 HRC)' },
+    { req: 'Carbon equivalent / chemistry', b31: 'Option B: P ≤ 0.015 %, inclusion-shape control', igem: 'CE ≤ 0.43 (UK practice)', csa: 'Engineering assessment', eiga: 'CE ≤ 0.43; S, P limits' },
+    { req: 'Fracture toughness in H2', b31: 'Option B: KIH ≥ 55 MPa√m (ASME VIII-3 KD-10)', igem: 'Fracture-toughness testing in H2 required (S5.3.4)', csa: 'Assess toughness reduction in H2', eiga: '—' },
+    { req: 'Fatigue', b31: 'Fatigue crack growth in H2 (KD-10 / Code Case 2938 basis)', igem: 'Fatigue-crack-growth assessment in H2', csa: 'Assess pressure cycling in H2', eiga: '—' },
+    { req: 'Repurposing existing lines', b31: 'Requalify to Option A or B', igem: 'Repurposing procedure included', csa: 'Lifecycle engineering assessment for conversions', eiga: '—' }
+  ];
+  /* ---- Regulatory / code blend thresholds (mol % H2) ---- */
+  const BLEND_RULES = [
+    { c: 'IGEM/TD/1 Supp 2 (UK high-pressure)', lim: 10, above: 'Treated as 100 % H2 — full Supplement 2 requirements', below: 'At or below 10 mol % — check the Supplement 2 blend provisions', src: 'R5, R67' },
+    { c: 'CSA Z662:23 Clause 17 (Canada)', lim: 0, above: 'Clause 17 applies — engineering assessment of materials, design and operation', below: 'No hydrogen — Clause 17 not triggered', src: 'R69' },
+    { c: 'ASME B31.12 (US)', lim: 0, above: 'Hydrogen service — B31.12 Part PL design / qualification', below: 'Natural gas — ASME B31.8', src: 'R2' },
+    { c: 'UK GS(M)R gas quality', lim: 0.1, above: 'Above the 0.1 mol % H2 limit — needs exemption or regulatory change', below: 'Within the GS(M)R limit', src: 'R36, R72' },
+    { c: 'Alberta AUC recommendation (distribution)', lim: 20, above: 'Above the 20 vol % recommended maximum', below: 'Within the 20 vol % recommendation (start with lower-level pilots)', src: 'R71' },
+    { c: 'India PNGRB preliminary (CGD pipelines ≤ X52)', lim: 10, above: 'Above the 10 % preliminary limit', below: 'Within the preliminary limit', src: 'R37' }
+  ];
+
+  root.H2D = { CODES, CODE_REQS, BLEND_RULES, REFS, DEFAULT_TABLES, GRADES, PIPE_OD, WALLS, GASES, SEAMS, TOLERANCE, WOBBE_STD, SL_TABLE, REPAIR_METHODS, REPAIR_MATRIX, EQUIP };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.H2D;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1336,6 +1393,8 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     { k: 'smysO', l: 'SMYS override (0 = grade value)', u: 'MPa', v: 0, share: 'smysO' },
     { k: 'smtsO', l: 'SMTS override (0 = grade value)', u: 'MPa', v: 0, share: 'smtsO' }
   ];
+  const codeOpts = () => D.CODES.map(c => [c.k, c.l]);
+  const allowP = (code, v, st, Ej, Tf) => E.codeAllowP(code, T(), { loc: v.loc, smys: st.smys, smts: st.smts, t: v.WT, D: v.OD, E: Ej, T: Tf });
   function steel(v) { const g = U.gradeBy(v.grade); return { smys: v.smysO > 0 ? v.smysO : g.smys, smts: v.smtsO > 0 ? v.smtsO : g.smts, g }; }
 
   /* ================================================================ PROJECT */
@@ -1373,13 +1432,17 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       const flow = (c, p1) => E.pipeFlow({ c, D: ID, L, p1: bar(p1), p2: bar(v.pmin), T: v.temp + 273.15, rough: v.rough / 1000, E: v.eff, dz: v.dz });
       const eNG = E.energyMW(ng, flow(ng, v.maop).mdot, basis());
       const eA = E.energyMW(h2, flow(h2, pA).mdot, basis()), eB = E.energyMW(h2, flow(h2, pB).mdot, basis());
+      const pI = Math.min(allowP('IGEM', v, st, seamE, Tf).P * 10, v.maop), pC = Math.min(allowP('CSA', v, st, seamE, Tf).P * 10, v.maop);
+      const eI = E.energyMW(h2, flow(h2, pI).mdot, basis()), eC = E.energyMW(h2, flow(h2, pC).mdot, basis());
       const eBl = E.energyMW(bl, flow(bl, v.maop).mdot, basis());
       const hoop = v.maop * v.OD / (20 * v.WT) / st.smys;
       const rows = [
         ['Natural gas (today)', fmt(v.maop, 1) + ' barg', fmt(eNG, 0), '100 %', chip('i', 'Baseline')],
         [`Blend ${v.h2blend} % H2 at existing MAOP`, fmt(v.maop, 1) + ' barg', fmt(eBl, 0), pct(eBl / eNG), chip(v.h2blend <= 10 ? 'g' : v.h2blend <= 20 ? 'a' : 'r', `pH2 = ${fmt(v.maop * v.h2blend / 100, 1)} bar`)],
         ['Repurposed 100 % H2 — B31.12 Option A', fmt(pA, 1) + ' barg', fmt(eA, 0), pct(eA / eNG), chip(pA < v.maop ? 'a' : 'g', pA < v.maop ? `Derated ${fmt((1 - pA / v.maop) * 100, 0)} %` : 'No derating')],
-        ['Repurposed 100 % H2 — B31.12 Option B', fmt(pB, 1) + ' barg', fmt(eB, 0), pct(eB / eNG), chip('a', 'Needs KIH ≥ 55 MPa√m tests')]
+        ['Repurposed 100 % H2 — B31.12 Option B', fmt(pB, 1) + ' barg', fmt(eB, 0), pct(eB / eNG), chip('a', 'Needs KIH ≥ 55 MPa√m tests')],
+        ['Repurposed 100 % H2 — IGEM/TD/1 Supp 2', fmt(pI, 1) + ' barg', fmt(eI, 0), pct(eI / eNG), chip('a', 'Toughness tests in H2 required')],
+        ['Repurposed 100 % H2 — CSA Z662 Cl. 17', fmt(pC, 1) + ' barg', fmt(eC, 0), pct(eC / eNG), chip('a', 'Engineering assessment')]
       ];
       const html = card('Pipeline at a glance', kv([
         ['Grade / SMYS / SMTS', `${esc(v.grade)} / ${fmt(st.smys, 0)} / ${fmt(st.smts, 0)}`, 'MPa', ref('R4')],
@@ -1387,7 +1450,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
         ['Hoop stress at existing MAOP', fmt(hoop * 100, 1), '% SMYS', ref('R1')],
         ['B31.8 allowable pressure (natural gas)', fmt(pB318, 1), 'barg', ref('R1')],
         ['Internal volume of segment', fmt(Math.PI * ID * ID / 4 * L, 0), 'm³']
-      ])) + card('Three hydrogen routes for this line (energy capacity, ' + basis() + ')', table(['Route', 'Inlet pressure', 'Energy flow MW', 'vs NG', 'Status'], rows, { num: [0, 1, 1, 1, 0] }) +
+      ])) + card('Hydrogen routes for this line by code (energy capacity, ' + basis() + ')', table(['Route', 'Inlet pressure', 'Energy flow MW', 'vs NG', 'Status'], rows, { num: [0, 1, 1, 1, 0] }) +
         note(`Steady isothermal flow from inlet pressure to ${v.pmin} barg over ${v.len} km. Energy capacity at the same pressure drop is ~80 % for pure H2: H2 has ~⅓ the volumetric heating value but flows ~3× faster. Details in <a href="#blend">Blending</a> and <a href="#repurpose">Repurposing</a>.`)) +
         card('Suggested workflow', `<ol class="steps">
           <li><a href="#gas">Gas properties</a> — confirm the natural-gas composition and blend properties.</li>
@@ -1479,7 +1542,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
         { k: 'maop', l: 'Existing MAOP', u: 'barg', v: 70, share: 'maop' },
         { k: 'loc', l: 'Location class', t: 'sel', o: locOpts, v: 1, share: 'loc', ref: 'R1' },
         { k: 'tdes', l: 'Design temperature', u: '°C', v: 50 },
-        { k: 'opt', l: 'B31.12 design method', t: 'sel', o: [['A', 'Option A — prescriptive (Hf)'], ['B', 'Option B — performance-based (KIH tests)']], v: 'A', ref: 'R2' }] },
+        { k: 'opt', l: 'Design code / method', t: 'sel', o: codeOpts, v: 'A', ref: ['R2', 'R5', 'R69'] }] },
       { title: 'Material test data (MTRs / in-situ / cut-outs)', fields: [
         { k: 'ysMax', l: 'Max actual yield strength', u: 'MPa', v: 455 },
         { k: 'utsMax', l: 'Max actual tensile strength', u: 'MPa', v: 560 },
@@ -1508,7 +1571,8 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       const pB318 = E.barlowP(st.smys, v.WT, v.OD, t.F_b318[v.loc], Ej, Tf) * 10;
       const A = E.b3112OptionA(st.smys, st.smts, v.WT, v.OD, t.F_A[v.loc], Ej, Tf, t.hf);
       const pA = A.P * 10, pB = E.barlowP(st.smys, v.WT, v.OD, t.F_B[v.loc], Ej, Tf) * 10;
-      const pCode = v.opt === 'B' ? pB : pA; const newMaop = Math.min(pCode, v.maop);
+      const byCode = Object.fromEntries(D.CODES.map(c => [c.k, allowP(c.k, v, st, Ej, Tf)]));
+      const pCode = byCode[v.opt].P * 10; const newMaop = Math.min(pCode, v.maop); const codeName = D.CODES.find(c => c.k === v.opt).l;
       const ch = { C: v.C, Mn: v.Mn, Si: v.Si, P: v.P, S: v.S, Cr: v.Cr, Mo: v.Mo, V: v.V, Ni: v.Ni, Cu: v.Cu, B: v.B };
       const ce = E.ceIIW(ch), pc = E.pcm(ch); const smysKsi = st.smys / 6.894757, utsKsi = v.utsMax / 6.894757;
       const hoopNew = newMaop * v.OD / (20 * v.WT) / st.smys * 100;
@@ -1516,7 +1580,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       const checks = [];
       const add = (n, val, lim, s, rf, act) => checks.push({ n, val, lim, s, rf, act });
       add('Base-metal hardness', `${v.hvBase} HV10`, `≤ ${L.hvBase} HV10`, v.hvBase > L.hvBase ? 'r' : v.hvBase > L.hvBase - 15 ? 'a' : 'g', ref('R3', 'R4'), 'Field hardness survey (UCI/Leeb) on representative joints; laboratory HV10 on cut-outs.');
-      add('Weld / HAZ hardness', `${v.hvWeld} HV10`, `≤ ${L.hvWeld} HV10`, v.hvWeld > L.hvWeld ? 'r' : v.hvWeld > L.hvWeld - 10 ? 'a' : 'g', ref('R2'), 'Hardness traverses on seam and girth-weld cut-outs.');
+      add('Weld / HAZ hardness', `${v.hvWeld} HV10`, `≤ ${L.hvWeld} HV10 (B31.12); EPRG ${L.hvWeldEPRG} avg / ${L.hvWeldEPRGmax} max`, v.hvWeld > L.hvWeldEPRGmax ? 'r' : v.hvWeld > L.hvWeld ? 'a' : v.hvWeld > L.hvWeld - 10 ? 'a' : 'g', ref('R2', 'R68'), 'Hardness traverses on seam and girth-weld cut-outs.');
       add('Hard spots', `${v.hardSpots}`, '0 (remove all)', v.hardSpots > 0 ? 'r' : 'g', ref('R9', 'R62'), 'Locate with ILI hard-spot tool; replace affected joints before H2 service.');
       add('Long seam', esc(seam.l), 'Seamless, HFW (normalised), DSAW', seam.s, ref('R62', 'R1'), seam.note);
       add('Grade / SMYS', `${esc(v.grade)} (${fmt(smysKsi, 0)} ksi)`, `Option A ≤ ${L.smysA} ksi; Option B ≤ ${L.smysB} ksi`, smysKsi > L.smysB ? 'r' : smysKsi > L.smysA ? (v.opt === 'B' ? 'a' : 'r') : smysKsi > 52.5 ? 'a' : 'g', ref('R2', 'R3'), 'Higher grades carry larger Hf penalty and higher H2 susceptibility; ≤ X52 preferred.');
@@ -1527,7 +1591,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       add('Phosphorus', `${v.P} %`, `≤ ${L.P} % (Option B)`, v.P > L.P ? (v.opt === 'B' ? 'r' : 'a') : 'g', ref('R2'), 'Segregation-related embrittlement.');
       add('Charpy toughness', `${v.cvn} J`, `≥ ${L.cvnMin} J (and BTCM arrest — see New design)`, v.cvn < L.cvnRed ? 'r' : v.cvn < L.cvnMin ? 'a' : 'g', ref('R18', 'R19'), 'H2 lowers fracture resistance even at low pH2 — retain margin.');
       add('DWTT shear area', `${v.dwtt} %`, '≥ 85 % at min. design temperature', v.dwtt < 85 ? 'a' : 'g', ref('R19'), 'Brittle-fracture control.');
-      add('KIH in hydrogen', v.kih > 0 ? `${v.kih} MPa√m` : 'Not tested', `≥ ${L.kih} MPa√m (Option B)`, v.kih > 0 ? (v.kih >= L.kih ? 'g' : 'r') : (v.opt === 'B' ? 'r' : 'a'), ref('R2', 'R51'), 'Test per ASME VIII-3 KD-10 / ASTM E1681 at design pH2 on base, seam and HAZ.');
+      add('KIH in hydrogen', v.kih > 0 ? `${v.kih} MPa√m` : 'Not tested', `≥ ${L.kih} MPa√m (B31.12 Option B); testing required by IGEM Supp 2`, v.kih > 0 ? (v.kih >= L.kih ? 'g' : 'r') : (v.opt === 'B' || v.opt === 'IGEM' ? 'r' : 'a'), ref('R2', 'R5', 'R51'), 'Test per ASME VIII-3 KD-10 / ASTM E1681 at design pH2 on base, seam and HAZ.');
       add('Crack-like features', { none: 'None', noili: 'Unknown (no crack ILI)', minor: 'Minor', scc: 'SCC / seam cracks' }[v.cracks], 'None, or ECA in H2', { none: 'g', noili: 'a', minor: 'a', scc: 'r' }[v.cracks], ref('R13', 'R14'), 'Run EMAT/UT crack ILI; assess flaws in the Fatigue & fracture module.');
       add('Dents', `${v.dent} % OD${v.dentWeld ? ' + on weld / with metal loss' : ''}`, `Plain ≤ ${L.dentH2} % for H2 screening (B31.8: ${L.dentB318} %)`, v.dentWeld ? 'r' : v.dent > L.dentB318 ? 'r' : v.dent > L.dentH2 ? 'a' : 'g', ref('R11'), 'Strain-based dent assessment; dents concentrate strain where H2 lowers ductility.');
       add('Metal loss', `${v.wallLoss} % t`, '< 40 % t screening; full B31G in ILI module', v.wallLoss > 60 ? 'r' : v.wallLoss > 40 ? 'a' : 'g', ref('R10'), 'Assess every anomaly with the ILI module at the H2 MAOP.');
@@ -1546,13 +1610,23 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
         ['B31.8 allowable (natural gas)', fmt(pB318, 1), 'barg', ref('R1')],
         [`B31.12 Option A — F = ${t.F_A[v.loc]}, Hf = ${fmt(A.Hf, 3)}`, fmt(pA, 1), 'barg', ref('R2')],
         [`B31.12 Option B — F = ${t.F_B[v.loc]}, Hf = 1`, fmt(pB, 1), 'barg', ref('R2')],
+        [`IGEM/TD/1 Supp 2 — F = ${byCode.IGEM.F}, Hf = ${fmt(byCode.IGEM.Hf, 3)}${st.smys <= 361 ? ' (≤ L360: not applied)' : ''}`, fmt(byCode.IGEM.P * 10, 1), 'barg', ref('R5', 'R67')],
+        [`CSA Z662 Cl. 17 — F·L = ${fmt(byCode.CSA.csaFL, 2)}; governed by ${byCode.CSA.governs}`, fmt(byCode.CSA.P * 10, 1), 'barg', ref('R69', 'R70')],
         ['Temperature derating factor T', fmt(Tf, 3), '–', ref('R1')],
-        [`<b>Hydrogen MAOP (Option ${v.opt}, ≤ existing MAOP)</b>`, `<b>${fmt(newMaop, 1)}</b>`, 'barg · ' + psig(newMaop)],
+        [`<b>Hydrogen MAOP (${esc(codeName)}, ≤ existing MAOP)</b>`, `<b>${fmt(newMaop, 1)}</b>`, 'barg · ' + psig(newMaop)],
         ['Derating vs existing MAOP', fmt((1 - newMaop / v.maop) * 100, 1), '%'],
         ['Hydrogen partial pressure at MAOP', fmt(pH2, 1), 'bar(a)', ref('R39')],
         [`Energy capacity, ${pr.len || 120} km to ${pmin} barg (H2 / NG)`, `${fmt(eH, 0)} / ${fmt(eNG, 0)}`, 'MW · ' + pct(eH / eNG)]
-      ]) + (v.opt === 'B' ? note('Option B requires fracture-mechanics qualification of base metal, seam and HAZ in hydrogen (KIH ≥ 55 MPa√m) and chemistry limits (P ≤ 0.015 %). ' + ref('R2', 'R51'), 'warn') : note('Option A uses the material performance factor Hf from the code table (editable in Code tables). ' + ref('R2'))));
+      ]) + (v.opt === 'IGEM' ? note('IGEM/TD/1 Supp 2: design factor capped at 0.5; B31.12 Hf applied to grades above L360; fracture-toughness testing in hydrogen required; blends above ' + L.igemBlend + ' mol % H2 are treated as 100 % H2. Class mapping 1→R, 2→S, 3/4→T is a tool assumption — edit in Code tables. ' + ref('R5', 'R67'), 'warn') : v.opt === 'CSA' ? note('CSA Z662:23 Clause 17 requires an engineering assessment rather than fixed limits. The tool uses the lower of the Z662 design factor (F·L) and the ASME B31.12 Option A factor that Z662 cites as guidance — a screening interpretation, not a code value. ' + ref('R69', 'R70'), 'warn') : '') + (v.opt === 'B' ? note('Option B requires fracture-mechanics qualification of base metal, seam and HAZ in hydrogen (KIH ≥ 55 MPa√m) and chemistry limits (P ≤ 0.015 %). ' + ref('R2', 'R51'), 'warn') : note('Option A uses the material performance factor Hf from the code table (editable in Code tables). ' + ref('R2'))));
       html += card(`Material & condition screening — ${chip(verdict[0], verdict[1])}`, table(['Check', 'Value', 'Criterion', 'Status', 'Ref', 'Action / note'], checks.map(c => [c.n, c.val, c.lim, chip(c.s, U.statusWord[c.s]), c.rf, c.act])));
+      const igemFull = v.h2 > L.igemBlend;
+      html += card('Code requirements — ASME B31.12, IGEM/TD/1 Supp 2, CSA Z662:23, EIGA', table(['Requirement', 'ASME B31.12 ' + ref('R2'), 'IGEM/TD/1 Supp 2 ' + ref('R5'), 'CSA Z662:23 Cl. 17 ' + ref('R69'), 'EIGA 121/14 ' + ref('R3')], D.CODE_REQS.map(r => [`<b>${esc(r.req)}</b>`, esc(r.b31), esc(r.igem), esc(r.csa), esc(r.eiga)])) +
+        kv([['Allowable pressure (this pipe)', `${fmt(pA, 1)} / ${fmt(byCode.IGEM.P * 10, 1)} / ${fmt(byCode.CSA.P * 10, 1)}`, 'barg (B31.12 A / IGEM / CSA)'],
+          ['IGEM blend threshold at ' + v.h2 + ' % H2', igemFull ? chip('r', `> ${L.igemBlend} %: full H2 requirements`) : chip('a', `≤ ${L.igemBlend} %: check blend provisions`), '', ref('R5')],
+          ['IGEM fracture-toughness testing in H2', v.kih > 0 ? chip('g', 'Data provided') : chip('r', 'Required — not yet tested'), '', ref('R5')],
+          ['IGEM / EIGA CE ≤ ' + L.ceIGEM, ce <= L.ceIGEM ? chip('g', 'CE ' + fmt(ce, 3)) : chip('r', 'CE ' + fmt(ce, 3)), '', ref('R5', 'R3')],
+          ['CSA Z662 Clause 17 engineering assessment', chip('a', 'Required for H2 and blends'), '', ref('R69')]]) +
+        note('Code text summarised from public sources (IGEM/CSA documents were not available in full). Values marked “verify” and all factors in Code tables must be checked against the licensed editions.', 'warn'));
       const acts = checks.filter(c => c.s !== 'g').map(c => `<li>${chip(c.s, c.n)} ${c.act}</li>`).join('');
       html += card('Recommended programme before conversion', `<ol class="steps">${acts}<li>Hydrostatic or pneumatic strength test to establish the H2 MAOP; N₂ purge and drying (dew point < −40 °C).</li><li>Replace or re-qualify valves, seals, instruments and compressors (see Instruments & equipment).</li><li>Update integrity management plan and safety case (PIR with H2, see Hydrogen safety).</li></ol>`);
       return { html, csv: { name: 'repurposing_screening', rows: [['Check', 'Value', 'Criterion', 'Status', 'Action'], ...checks.map(c => [c.n, String(c.val).replace(/<[^>]+>/g, ''), c.lim, U.statusWord[c.s], c.act])] } };
@@ -1627,6 +1701,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
         lineChart({ title: 'Outlet velocity vs H2 fraction', xLabel: 'H2 in blend (mol %)', yLabel: 'm/s', series: [{ name: 'Outlet velocity', pts: sweep.map(s => [s.x, s.vOut]), ci: 3 }, { name: 'Erosional velocity (API RP 14E)', pts: sweep.map(s => [s.x, s.vEros]), ci: 4, dash: true }] }) +
         (v.mode === 'energy' && sweep.some(s => !s.feasible) ? note(`Above ~${sweep.find(s => !s.feasible).x} % H2 the fixed energy demand cannot be delivered within MAOP for this segment — more compression stations or looping would be needed.`, 'warn') : ''));
       const tol = D.TOLERANCE.map(t => [t.c, fmt(t.pct, t.pct < 1 ? 1 : 0) + ' %', chip(v.h2 <= t.pct ? 'g' : 'r', v.h2 <= t.pct ? 'Within' : 'Exceeds'), t.note, ref(...t.src.split(', '))]);
+      html += card(`Code & regulatory thresholds at ${v.h2} % H2`, table(['Code / regulation', 'Threshold', 'Status', 'Ref'], D.BLEND_RULES.map(r => { const over = v.h2 > r.lim; return [r.c, r.lim > 0 ? r.lim + ' mol %' : 'any H2', chip(over ? (r.lim === 0 ? 'a' : 'r') : 'g', over ? r.above : r.below), ref(...r.src.split(', '))]; })));
       html += card('Materials exposure at this blend', kv([
         ['H2 partial pressure at MAOP', fmt(b.pH2, 2), 'bar(a)', ref('R39')],
         ['Fracture toughness', b.pH2 > 0 ? 'Reduced — knock-down applies even below 1 bar H2' : '—', '', ref('R39', 'R38')],
@@ -1654,7 +1729,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
         { k: 'psrc', l: 'Source pressure (electrolyser / plant)', u: 'barg', v: 30 },
         { k: 'temp', l: 'Flowing temperature', u: '°C', v: 20 }, { k: 'dz', l: 'Elevation change', u: 'm', v: 0 }] },
       { title: 'Mechanical design', fields: [
-        { k: 'opt', l: 'B31.12 method', t: 'sel', o: [['A', 'Option A — prescriptive'], ['B', 'Option B — performance-based']], v: 'A', ref: 'R2' },
+        { k: 'opt', l: 'Design code / method', t: 'sel', o: codeOpts, v: 'A', ref: ['R2', 'R5', 'R69'] },
         { k: 'loc', l: 'Location class', t: 'sel', o: locOpts, v: 1 },
         { k: 'grade', l: 'Grade', t: 'sel', o: gradeOpts, v: 'X52 (L360)', ref: 'R3' },
         { k: 'tdes', l: 'Design temperature', u: '°C', v: 50 }, { k: 'tmin', l: 'Minimum design temperature', u: '°C', v: -10 },
@@ -1668,12 +1743,12 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     ],
     compute(v) {
       const t = T(); const c = mix(v.h2); const mdot = flowToMdot(c, v.unit, v.flow); const Tk = v.temp + 273.15; const g = U.gradeBy(v.grade);
-      const Tf = E.tempDerating(v.tdes); const F = (v.opt === 'B' ? t.F_B : t.F_A)[v.loc];
-      const hf = v.opt === 'B' ? 1 : E.hfLookup(t.hf, g.smts, v.pdes / 10).hf;
+      const Tf = E.tempDerating(v.tdes); const cf = E.codeFactor(v.opt, t, v.loc, g.smys, g.smts, v.pdes / 10);
+      const F = cf.F, hf = cf.Hf, eff = cf.eff;
       const cands = [];
       for (const [nps, OD] of D.PIPE_OD) {
         if (OD < 100) continue;
-        const treq = v.pdes / 10 * OD / (2 * g.smys * F * Tf * hf) + v.ca;
+        const treq = v.pdes / 10 * OD / (2 * g.smys * eff * Tf) + v.ca;
         const tsel = D.WALLS.find(w => w >= Math.max(treq, v.tMin, OD / v.dtMax)) || NaN;
         if (!isFinite(tsel)) continue;
         const ID = (OD - 2 * tsel) / 1000; const A = Math.PI * ID * ID / 4;
@@ -1686,7 +1761,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       if (!sel) sel = cands[cands.length - 1];
       let html = card('Size screening (all standard NPS)', table(['NPS', 'OD mm', 't req mm', 't sel mm', 'Outlet barg', 'Outlet v m/s', 'Hoop % SMYS', 'Steel t/km', 'Status'],
         cands.map(x => ({ _cls: x === sel ? 'sel' : '', cells: [x.nps + '"', fmt(x.OD, 1), fmt(x.treq, 2), fmt(x.tsel, 1), isFinite(x.p2) ? fmt(x.p2, 1) : 'infeasible', isFinite(x.vOut) ? fmt(x.vOut, 1) : '—', fmt(x.hoop, 1), fmt(x.steel, 1), x.ok ? chip('g', 'Feasible') : chip('r', !isFinite(x.p2) || x.p2 < v.pmin ? 'Δp too high' : 'Velocity')] })), { num: [0, 1, 1, 1, 1, 1, 1, 1, 0] }) +
-        note(`t = P·D/(2·S·F·E·T·Hf) + CA with F = ${F}, Hf = ${fmt(hf, 3)}, T = ${fmt(Tf, 3)}; wall rounded up to the next standard thickness, D/t ≤ ${v.dtMax}. ${ref('R2')}`));
+        note(`${esc(D.CODES.find(c => c.k === v.opt).l)}: t = P·D/(2·S·E·T·F·Hf) + CA with F·Hf = ${fmt(eff, 3)} (F = ${fmt(F, 2)}, Hf = ${fmt(hf, 3)}${cf.governs ? ', governed by ' + cf.governs : ''}), T = ${fmt(Tf, 3)}; wall rounded up to the next standard thickness, D/t ≤ ${v.dtMax}. ${ref(D.CODES.find(c => c.k === v.opt).ref)}`));
       if (!sel) return { html };
       const P0 = v.pdes / 10; const hydroRatio = Math.max(t.hydro[v.loc], 1.25); // 1.25 floor adopted for H2 service (tool default)
       const bt = E.btcm({ D: sel.OD, t: sel.tsel, SMYS: g.smys, P0: P0 + 0.101, T: Tk, c });
@@ -1694,7 +1769,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       const comp = v.pin > v.psrc ? E.compressor({ c, mdot, ps: bar(v.psrc), pd: bar(v.pin), Ts: Tk, eta: v.eta, maxRatio: 3 }) : null;
       const lp = E.linepack({ c, D: sel.ID / 1, L: v.len * 1000, p1: bar(v.pin), p2: bar(Math.max(sel.p2, 0)), T: Tk });
       const prof = []; for (let i = 0; i <= 20; i++) { const Li = v.len * 1000 * i / 20; const o = i ? E.pipeOutlet({ c, D: sel.ID, L: Li, p1: bar(v.pin), mdot, T: Tk, rough: v.rough / 1000, E: v.eff, dz: v.dz * i / 20 }) : { p2: bar(v.pin) }; prof.push([Li / 1000, barg(o.p2)]); }
-      const maop = E.barlowP(g.smys, sel.tsel - v.ca, sel.OD, F, 1, Tf, v.opt === 'B' ? 1 : E.hfLookup(t.hf, g.smts, v.pdes / 10).hf) * 10;
+      const maop = E.codeAllowP(v.opt, t, { loc: v.loc, smys: g.smys, smts: g.smts, t: sel.tsel - v.ca, D: sel.OD, E: 1, T: Tf }).P * 10;
       html += card(`Selected design: ${sel.nps}" × ${fmt(sel.tsel, 1)} mm ${esc(v.grade)} PSL2`, kv([
         ['Mass flow / energy flow', `${fmt(mdot, 3)} kg/s / ${fmt(E.energyMW(c, mdot, basis()), 0)} MW`, basis()],
         ['Standard volume flow', fmt(E.stdFlow(c, mdot) * 86400 / 1e6, 3), 'MMSCMD'],
@@ -2161,6 +2236,9 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       if (v.P > 0.015) issues.push([chip('a', 'Phosphorus'), 'B31.12 Option B requires P ≤ 0.015 %.']);
       if (d.cvn && v.cvn < d.cvn) issues.push([chip('r', 'Toughness'), `CVN below the design requirement (${fmt(d.cvn, 0)} J from fracture-arrest analysis).`]);
       if (!v.tKIH && d.opt === 'B') issues.push([chip('r', 'Option B'), 'Option B design requires KIH testing.']);
+      if (!v.tKIH && !v.tJR && d.opt === 'IGEM') issues.push([chip('r', 'IGEM Supp 2'), 'IGEM/TD/1 Supplement 2 requires fracture-toughness testing in hydrogen — select KIH or J-R testing.']);
+      if (d.opt === 'IGEM' && v.ce > 0.43) issues.push([chip('a', 'CE'), 'UK practice for hydrogen pipelines limits CE(IIW) to 0.43.']);
+      if (d.opt === 'CSA') issues.push([chip('a', 'CSA Z662 Cl. 17'), 'Clause 17 requires an engineering assessment of material selection for hydrogen — attach the hydrogen test results of §7 to that assessment.']);
       const chem = [['C', v.C], ['Si', v.Si], ['Mn', v.Mn], ['P', v.P], ['S', v.S], ['Nb+V+Ti', v.NbVTi], ['Cu', v.Cu], ['Ni', v.Ni], ['Cr', v.Cr], ['Mo', v.Mo], ['B', v.Bmax], ['N', v.N], ['CE(IIW)', v.ce], ['CE(Pcm)', v.pcm]];
       const tests = [];
       if (v.tKIH) tests.push(['Threshold stress intensity KIH', `ASTM E1681 constant-displacement (or rising-load per ASME VIII-3 KD-10) in ≥ 99.999 % H2 at ≥ ${fmt(v.dp, 0)} bar(a), room temperature`, `KIH ≥ ${v.kih} MPa√m for base metal, seam weld and HAZ`, 'First heat per process qualification + 1 per 50 heats']);
@@ -2170,8 +2248,8 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       if (v.tMicro) tests.push(['Microstructure', 'Metallography of body, seam, HAZ', 'Fine ferrite–pearlite / acicular ferrite; no martensite or upper-bainite bands; centreline segregation ≤ Mannesmann class 2; inclusion rating ASTM E45 ≤ 1.5 thin', 'Process qualification + 1 per heat']);
       const sec = (n, t, b) => `<section class="spec-sec"><h4>${n}. ${t}</h4>${b}</section>`;
       const doc = `<div class="spec-doc"><header><p class="eyebrow">Purchase specification · supplementary to API Spec 5L / ISO 3183 PSL2</p><h3>${esc(v.spec)} rev ${esc(v.rev)} — Line pipe for hydrogen service</h3><p>${esc(S().meta.project)}</p></header>
-        ${sec(1, 'Scope', `<p>Requirements for ${esc(v.seam)} line pipe, ${fmt(v.OD, 1)} mm OD × ${fmt(v.WT, 1)} mm WT, grade ${esc(v.grade)}${v.route.match(/\((\w)\)/) ? v.route.match(/\((\w)\)/)[1] : ''} PSL2, for a pipeline conveying ${v.h2} mol % hydrogen at a design pressure of ${fmt(v.dp, 1)} barg (${fmt(v.dp * 14.5038, 0)} psig), designed to ASME B31.12 Part PL. Total quantity ${fmt(v.qty, 1)} km (${Math.ceil(v.qty * 1000 / v.len)} pipes of ${v.len} m nominal). These requirements supplement API 5L; where they differ, this specification governs.</p>`)}
-        ${sec(2, 'Normative references', `<p>API Spec 5L (46th/47th ed.) / ISO 3183:2019; ASME B31.12-2023; EIGA Doc 121/14; ASME BPVC VIII-3 KD-10 & Code Case 2938; ASTM E1681, E647, E1820, E45, E384; NACE TM0284; ISO 10893 (NDT); ISO 21809 (coatings); EN 10204 (inspection documents).</p>`)}
+        ${sec(1, 'Scope', `<p>Requirements for ${esc(v.seam)} line pipe, ${fmt(v.OD, 1)} mm OD × ${fmt(v.WT, 1)} mm WT, grade ${esc(v.grade)}${v.route.match(/\((\w)\)/) ? v.route.match(/\((\w)\)/)[1] : ''} PSL2, for a pipeline conveying ${v.h2} mol % hydrogen at a design pressure of ${fmt(v.dp, 1)} barg (${fmt(v.dp * 14.5038, 0)} psig), designed to ${esc((D.CODES.find(c => c.k === (des().opt || 'A')) || D.CODES[0]).l)}. Total quantity ${fmt(v.qty, 1)} km (${Math.ceil(v.qty * 1000 / v.len)} pipes of ${v.len} m nominal). These requirements supplement API 5L; where they differ, this specification governs.</p>`)}
+        ${sec(2, 'Normative references', `<p>API Spec 5L (46th/47th ed.) / ISO 3183:2019; ASME B31.12-2023; IGEM/TD/1 Ed. 6 Supplement 2; CSA Z662:23 Clause 17; EIGA Doc 121/14; ASME BPVC VIII-3 KD-10 & Code Case 2938; ASTM E1681, E647, E1820, E45, E384; NACE TM0284; ISO 10893 (NDT); ISO 21809 (coatings); EN 10204 (inspection documents).</p>`)}
         ${sec(3, 'Manufacturing', `<ul><li>Steel: fully killed, fine-grain, ${esc(v.route)}; vacuum degassed; calcium treated for inclusion-shape control (Ca/S ≥ 1.5).</li><li>Process: ${esc(v.seam)}; the manufacturing procedure specification (MPS) shall be qualified by a first-day production test including all hydrogen tests in §7.</li><li>No cold expansion > 1.5 % for SAW pipe; HFW seams fully normalised (full-body or seam heat treatment) with seam hardness ≤ ${v.hvw} HV10.</li><li>Repair welding of pipe body not permitted; seam repairs limited per API 5L and qualified with hardness ≤ ${v.hvw} HV10.</li></ul>`)}
         ${sec(4, 'Chemical composition (product analysis, max wt %)', table(chem.map(c => c[0]), [chem.map(c => fmt(c[1], c[1] < 0.01 ? 4 : 3))]) + '<p>CE(IIW) = C + Mn/6 + (Cr+Mo+V)/5 + (Ni+Cu)/15; CE(Pcm) = C + Si/30 + (Mn+Cu+Cr)/20 + Ni/60 + Mo/15 + V/10 + 5B. Intentional additions of B are not permitted.</p>')}
         ${sec(5, 'Mechanical properties', table(['Property', 'Requirement'], [['Yield strength Rt0.5', `${g.smys} – ${fmt(v.ysx, 0)} MPa`], ['Tensile strength Rm', `${g.smts} – ${g.tmax} MPa`], ['Y/T ratio', `≤ ${v.yt}`], ['Elongation', 'Per API 5L Table 7 formula'], ['Hardness — body', `≤ ${v.hvb} HV10`], ['Hardness — weld & HAZ', `≤ ${v.hvw} HV10`], ['CVN at ' + v.tmin + ' °C — body (avg/min)', `${v.cvn} / ${Math.round(v.cvn * 0.75)} J (full size)`], ['CVN at ' + v.tmin + ' °C — weld & HAZ (avg/min)', `${v.cvnw} / ${Math.round(v.cvnw * 0.75)} J`], ['DWTT at ' + v.tmin + ' °C', `≥ ${v.dwtt} % shear area (avg. of 2)`]]))}
@@ -2303,7 +2381,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
       const arr = (key, label, r) => `<tr><th>${label} ${ref(r)}</th>${t[key].map((x, i) => `<td><input type="number" step="0.01" data-arr="${key}_${i}" value="${x}" aria-label="${label} ${t.loc[i]}"/></td>`).join('')}</tr>`;
       const obj = (key, title, refs) => card(title, `<div class="formgrid">${Object.entries(t[key]).map(([k, x]) => `<div class="fld"><label for="o_${key}_${k}">${k}</label><input id="o_${key}_${k}" type="${typeof x === 'boolean' ? 'checkbox' : 'number'}" step="any" data-obj="${key}.${k}" value="${x}"/></div>`).join('')}</div>` + (refs || ''));
       return card('ASME B31.12 Table IX-5A — material performance factor Hf ' + ref('R2'), hf + note('Rows are strength bands: a grade uses the first row whose SMTS it does not exceed (+1 ksi tolerance, so X52 PSL2 at 66.7 ksi uses the ≤ 66 ksi row). Values are interpolated linearly in pressure. Pressures above the last column or SMTS above the last row are outside the table (the tool reports “—”).')) +
-        card('Design factors and test ratios by location class', `<div class="tbl-wrap"><table class="grid edit"><thead><tr><th></th>${t.loc.map(l => `<th>${l}</th>`).join('')}</tr></thead><tbody>${arr('F_b318', 'B31.8 design factor F', 'R1')}${arr('F_A', 'B31.12 Option A F', 'R2')}${arr('F_B', 'B31.12 Option B F', 'R2')}${arr('hydro', 'Hydrotest / MAOP', 'R60')}</tbody></table></div>`) +
+        card('Design factors and test ratios by location class', `<div class="tbl-wrap"><table class="grid edit"><thead><tr><th></th>${t.loc.map(l => `<th>${l}</th>`).join('')}</tr></thead><tbody>${arr('F_b318', 'B31.8 design factor F', 'R1')}${arr('F_A', 'B31.12 Option A F', 'R2')}${arr('F_B', 'B31.12 Option B F', 'R2')}${arr('hydro', 'Hydrotest / MAOP', 'R60')}${arr('F_IGEM', 'IGEM/TD/1 Supp 2 F (1→R, 2→S, 3/4→T)', 'R5')}${arr('L_CSA', 'CSA Z662 location factor L (× F_CSA)', 'R69')}</tbody></table></div>`) +
         obj('limits', 'Screening limits', note('hv* in HV10; ceIIW, pcm; S, P in wt %; cvn* in J; kih MPa√m; smys*/uts* in ksi; stress* in % SMYS; dent* in % OD; cpLimit V CSE. ' + ref('R2', 'R3', 'R4', 'R9', 'R33'))) +
         obj('fcg', 'Fatigue crack growth constants (CC2938 form, BS 7910 air)', note('da/dN = min(CL·(1+rL·R)/(1−R)·ΔK^mL·√(pH2/pRef), CH·(1+rH·R)/(1−R)·ΔK^mH); air: airC·ΔK^airM. lifeFactor = divisor on calculated life. ' + ref('R14', 'R16', 'R51'))) +
         obj('pir', 'Rupture fire (PIR) model parameters', note('XgH2 calibrated so that pure H2 reproduces the 0.47 code constant; XgNG = 0.2 reproduces ≈ 0.69 for NG (Verification V10/V11). ' + ref('R6', 'R7', 'R8'))) +
@@ -2357,7 +2435,7 @@ a.ref:hover { background: var(--accent); color: var(--accent-ink); }
     page() {
       return card('Scope', `<ul class="steps"><li>Three transport routes: repurposed NG pipeline (100 % H2), new H2 pipeline, H2 blended into NG pipelines — plus CGD blending.</li><li>Steady-state hydraulics (isothermal), real-gas Z (Peng–Robinson + volume translation), ISO 6976 heating values and Wobbe index.</li><li>Mechanical design to ASME B31.12 (Option A/B) and B31.8; flaw assessment (Modified B31G, LEFM with CC2938 hydrogen FCG curves).</li><li>Consequence models: choked release, notional nozzle, Froude-number flame length, point-source radiation, jet dispersion to LFL, TNT equivalence, PIR.</li></ul>`) +
         card('Limitations — read before use', `<ul class="steps"><li>Results are for screening, option comparison and specification drafting. Final design, MAOP establishment and safety studies must be performed and checked by competent engineers with licensed standards and validated software (e.g. AGA 8/GERG-2008, transient hydraulics, PHAST/HyRAM+, full ECA).</li><li>Code values are transcribed and <b>editable</b> (Code tables). Verify against your edition.</li><li>Hydraulics are steady and isothermal; Joule–Thomson cooling, transients and line-pack dynamics are not modelled.</li><li>Consequence models neglect wind, terrain, crater formation and obstacles; jet-fire radiation uses a single point source.</li><li>Fatigue uses semi-elliptical surface-flaw solutions in a flat plate with a bulging correction; residual stresses and weld misalignment are not included.</li></ul>`) +
-        card('Portability', `<p>Single HTML file. Works offline in Chrome, Edge, Firefox and Safari on Windows and macOS. Data is stored in your browser and in project files you save. Version 1.0 (${new Date().getFullYear()}).</p>`);
+        card('Portability', `<p>Single HTML file. Works offline in Chrome, Edge, Firefox and Safari on Windows and macOS. Data is stored in your browser and in project files you save. Version 1.1 (${new Date().getFullYear()}).</p>`);
     },
     bindPage() { }
   });

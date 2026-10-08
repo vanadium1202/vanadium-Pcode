@@ -26,6 +26,8 @@
     { k: 'smysO', l: 'SMYS override (0 = grade value)', u: 'MPa', v: 0, share: 'smysO' },
     { k: 'smtsO', l: 'SMTS override (0 = grade value)', u: 'MPa', v: 0, share: 'smtsO' }
   ];
+  const codeOpts = () => D.CODES.map(c => [c.k, c.l]);
+  const allowP = (code, v, st, Ej, Tf) => E.codeAllowP(code, T(), { loc: v.loc, smys: st.smys, smts: st.smts, t: v.WT, D: v.OD, E: Ej, T: Tf });
   function steel(v) { const g = U.gradeBy(v.grade); return { smys: v.smysO > 0 ? v.smysO : g.smys, smts: v.smtsO > 0 ? v.smtsO : g.smts, g }; }
 
   /* ================================================================ PROJECT */
@@ -63,13 +65,17 @@
       const flow = (c, p1) => E.pipeFlow({ c, D: ID, L, p1: bar(p1), p2: bar(v.pmin), T: v.temp + 273.15, rough: v.rough / 1000, E: v.eff, dz: v.dz });
       const eNG = E.energyMW(ng, flow(ng, v.maop).mdot, basis());
       const eA = E.energyMW(h2, flow(h2, pA).mdot, basis()), eB = E.energyMW(h2, flow(h2, pB).mdot, basis());
+      const pI = Math.min(allowP('IGEM', v, st, seamE, Tf).P * 10, v.maop), pC = Math.min(allowP('CSA', v, st, seamE, Tf).P * 10, v.maop);
+      const eI = E.energyMW(h2, flow(h2, pI).mdot, basis()), eC = E.energyMW(h2, flow(h2, pC).mdot, basis());
       const eBl = E.energyMW(bl, flow(bl, v.maop).mdot, basis());
       const hoop = v.maop * v.OD / (20 * v.WT) / st.smys;
       const rows = [
         ['Natural gas (today)', fmt(v.maop, 1) + ' barg', fmt(eNG, 0), '100 %', chip('i', 'Baseline')],
         [`Blend ${v.h2blend} % H2 at existing MAOP`, fmt(v.maop, 1) + ' barg', fmt(eBl, 0), pct(eBl / eNG), chip(v.h2blend <= 10 ? 'g' : v.h2blend <= 20 ? 'a' : 'r', `pH2 = ${fmt(v.maop * v.h2blend / 100, 1)} bar`)],
         ['Repurposed 100 % H2 — B31.12 Option A', fmt(pA, 1) + ' barg', fmt(eA, 0), pct(eA / eNG), chip(pA < v.maop ? 'a' : 'g', pA < v.maop ? `Derated ${fmt((1 - pA / v.maop) * 100, 0)} %` : 'No derating')],
-        ['Repurposed 100 % H2 — B31.12 Option B', fmt(pB, 1) + ' barg', fmt(eB, 0), pct(eB / eNG), chip('a', 'Needs KIH ≥ 55 MPa√m tests')]
+        ['Repurposed 100 % H2 — B31.12 Option B', fmt(pB, 1) + ' barg', fmt(eB, 0), pct(eB / eNG), chip('a', 'Needs KIH ≥ 55 MPa√m tests')],
+        ['Repurposed 100 % H2 — IGEM/TD/1 Supp 2', fmt(pI, 1) + ' barg', fmt(eI, 0), pct(eI / eNG), chip('a', 'Toughness tests in H2 required')],
+        ['Repurposed 100 % H2 — CSA Z662 Cl. 17', fmt(pC, 1) + ' barg', fmt(eC, 0), pct(eC / eNG), chip('a', 'Engineering assessment')]
       ];
       const html = card('Pipeline at a glance', kv([
         ['Grade / SMYS / SMTS', `${esc(v.grade)} / ${fmt(st.smys, 0)} / ${fmt(st.smts, 0)}`, 'MPa', ref('R4')],
@@ -77,7 +83,7 @@
         ['Hoop stress at existing MAOP', fmt(hoop * 100, 1), '% SMYS', ref('R1')],
         ['B31.8 allowable pressure (natural gas)', fmt(pB318, 1), 'barg', ref('R1')],
         ['Internal volume of segment', fmt(Math.PI * ID * ID / 4 * L, 0), 'm³']
-      ])) + card('Three hydrogen routes for this line (energy capacity, ' + basis() + ')', table(['Route', 'Inlet pressure', 'Energy flow MW', 'vs NG', 'Status'], rows, { num: [0, 1, 1, 1, 0] }) +
+      ])) + card('Hydrogen routes for this line by code (energy capacity, ' + basis() + ')', table(['Route', 'Inlet pressure', 'Energy flow MW', 'vs NG', 'Status'], rows, { num: [0, 1, 1, 1, 0] }) +
         note(`Steady isothermal flow from inlet pressure to ${v.pmin} barg over ${v.len} km. Energy capacity at the same pressure drop is ~80 % for pure H2: H2 has ~⅓ the volumetric heating value but flows ~3× faster. Details in <a href="#blend">Blending</a> and <a href="#repurpose">Repurposing</a>.`)) +
         card('Suggested workflow', `<ol class="steps">
           <li><a href="#gas">Gas properties</a> — confirm the natural-gas composition and blend properties.</li>
@@ -169,7 +175,7 @@
         { k: 'maop', l: 'Existing MAOP', u: 'barg', v: 70, share: 'maop' },
         { k: 'loc', l: 'Location class', t: 'sel', o: locOpts, v: 1, share: 'loc', ref: 'R1' },
         { k: 'tdes', l: 'Design temperature', u: '°C', v: 50 },
-        { k: 'opt', l: 'B31.12 design method', t: 'sel', o: [['A', 'Option A — prescriptive (Hf)'], ['B', 'Option B — performance-based (KIH tests)']], v: 'A', ref: 'R2' }] },
+        { k: 'opt', l: 'Design code / method', t: 'sel', o: codeOpts, v: 'A', ref: ['R2', 'R5', 'R69'] }] },
       { title: 'Material test data (MTRs / in-situ / cut-outs)', fields: [
         { k: 'ysMax', l: 'Max actual yield strength', u: 'MPa', v: 455 },
         { k: 'utsMax', l: 'Max actual tensile strength', u: 'MPa', v: 560 },
@@ -198,7 +204,8 @@
       const pB318 = E.barlowP(st.smys, v.WT, v.OD, t.F_b318[v.loc], Ej, Tf) * 10;
       const A = E.b3112OptionA(st.smys, st.smts, v.WT, v.OD, t.F_A[v.loc], Ej, Tf, t.hf);
       const pA = A.P * 10, pB = E.barlowP(st.smys, v.WT, v.OD, t.F_B[v.loc], Ej, Tf) * 10;
-      const pCode = v.opt === 'B' ? pB : pA; const newMaop = Math.min(pCode, v.maop);
+      const byCode = Object.fromEntries(D.CODES.map(c => [c.k, allowP(c.k, v, st, Ej, Tf)]));
+      const pCode = byCode[v.opt].P * 10; const newMaop = Math.min(pCode, v.maop); const codeName = D.CODES.find(c => c.k === v.opt).l;
       const ch = { C: v.C, Mn: v.Mn, Si: v.Si, P: v.P, S: v.S, Cr: v.Cr, Mo: v.Mo, V: v.V, Ni: v.Ni, Cu: v.Cu, B: v.B };
       const ce = E.ceIIW(ch), pc = E.pcm(ch); const smysKsi = st.smys / 6.894757, utsKsi = v.utsMax / 6.894757;
       const hoopNew = newMaop * v.OD / (20 * v.WT) / st.smys * 100;
@@ -206,7 +213,7 @@
       const checks = [];
       const add = (n, val, lim, s, rf, act) => checks.push({ n, val, lim, s, rf, act });
       add('Base-metal hardness', `${v.hvBase} HV10`, `≤ ${L.hvBase} HV10`, v.hvBase > L.hvBase ? 'r' : v.hvBase > L.hvBase - 15 ? 'a' : 'g', ref('R3', 'R4'), 'Field hardness survey (UCI/Leeb) on representative joints; laboratory HV10 on cut-outs.');
-      add('Weld / HAZ hardness', `${v.hvWeld} HV10`, `≤ ${L.hvWeld} HV10`, v.hvWeld > L.hvWeld ? 'r' : v.hvWeld > L.hvWeld - 10 ? 'a' : 'g', ref('R2'), 'Hardness traverses on seam and girth-weld cut-outs.');
+      add('Weld / HAZ hardness', `${v.hvWeld} HV10`, `≤ ${L.hvWeld} HV10 (B31.12); EPRG ${L.hvWeldEPRG} avg / ${L.hvWeldEPRGmax} max`, v.hvWeld > L.hvWeldEPRGmax ? 'r' : v.hvWeld > L.hvWeld ? 'a' : v.hvWeld > L.hvWeld - 10 ? 'a' : 'g', ref('R2', 'R68'), 'Hardness traverses on seam and girth-weld cut-outs.');
       add('Hard spots', `${v.hardSpots}`, '0 (remove all)', v.hardSpots > 0 ? 'r' : 'g', ref('R9', 'R62'), 'Locate with ILI hard-spot tool; replace affected joints before H2 service.');
       add('Long seam', esc(seam.l), 'Seamless, HFW (normalised), DSAW', seam.s, ref('R62', 'R1'), seam.note);
       add('Grade / SMYS', `${esc(v.grade)} (${fmt(smysKsi, 0)} ksi)`, `Option A ≤ ${L.smysA} ksi; Option B ≤ ${L.smysB} ksi`, smysKsi > L.smysB ? 'r' : smysKsi > L.smysA ? (v.opt === 'B' ? 'a' : 'r') : smysKsi > 52.5 ? 'a' : 'g', ref('R2', 'R3'), 'Higher grades carry larger Hf penalty and higher H2 susceptibility; ≤ X52 preferred.');
@@ -217,7 +224,7 @@
       add('Phosphorus', `${v.P} %`, `≤ ${L.P} % (Option B)`, v.P > L.P ? (v.opt === 'B' ? 'r' : 'a') : 'g', ref('R2'), 'Segregation-related embrittlement.');
       add('Charpy toughness', `${v.cvn} J`, `≥ ${L.cvnMin} J (and BTCM arrest — see New design)`, v.cvn < L.cvnRed ? 'r' : v.cvn < L.cvnMin ? 'a' : 'g', ref('R18', 'R19'), 'H2 lowers fracture resistance even at low pH2 — retain margin.');
       add('DWTT shear area', `${v.dwtt} %`, '≥ 85 % at min. design temperature', v.dwtt < 85 ? 'a' : 'g', ref('R19'), 'Brittle-fracture control.');
-      add('KIH in hydrogen', v.kih > 0 ? `${v.kih} MPa√m` : 'Not tested', `≥ ${L.kih} MPa√m (Option B)`, v.kih > 0 ? (v.kih >= L.kih ? 'g' : 'r') : (v.opt === 'B' ? 'r' : 'a'), ref('R2', 'R51'), 'Test per ASME VIII-3 KD-10 / ASTM E1681 at design pH2 on base, seam and HAZ.');
+      add('KIH in hydrogen', v.kih > 0 ? `${v.kih} MPa√m` : 'Not tested', `≥ ${L.kih} MPa√m (B31.12 Option B); testing required by IGEM Supp 2`, v.kih > 0 ? (v.kih >= L.kih ? 'g' : 'r') : (v.opt === 'B' || v.opt === 'IGEM' ? 'r' : 'a'), ref('R2', 'R5', 'R51'), 'Test per ASME VIII-3 KD-10 / ASTM E1681 at design pH2 on base, seam and HAZ.');
       add('Crack-like features', { none: 'None', noili: 'Unknown (no crack ILI)', minor: 'Minor', scc: 'SCC / seam cracks' }[v.cracks], 'None, or ECA in H2', { none: 'g', noili: 'a', minor: 'a', scc: 'r' }[v.cracks], ref('R13', 'R14'), 'Run EMAT/UT crack ILI; assess flaws in the Fatigue & fracture module.');
       add('Dents', `${v.dent} % OD${v.dentWeld ? ' + on weld / with metal loss' : ''}`, `Plain ≤ ${L.dentH2} % for H2 screening (B31.8: ${L.dentB318} %)`, v.dentWeld ? 'r' : v.dent > L.dentB318 ? 'r' : v.dent > L.dentH2 ? 'a' : 'g', ref('R11'), 'Strain-based dent assessment; dents concentrate strain where H2 lowers ductility.');
       add('Metal loss', `${v.wallLoss} % t`, '< 40 % t screening; full B31G in ILI module', v.wallLoss > 60 ? 'r' : v.wallLoss > 40 ? 'a' : 'g', ref('R10'), 'Assess every anomaly with the ILI module at the H2 MAOP.');
@@ -236,13 +243,23 @@
         ['B31.8 allowable (natural gas)', fmt(pB318, 1), 'barg', ref('R1')],
         [`B31.12 Option A — F = ${t.F_A[v.loc]}, Hf = ${fmt(A.Hf, 3)}`, fmt(pA, 1), 'barg', ref('R2')],
         [`B31.12 Option B — F = ${t.F_B[v.loc]}, Hf = 1`, fmt(pB, 1), 'barg', ref('R2')],
+        [`IGEM/TD/1 Supp 2 — F = ${byCode.IGEM.F}, Hf = ${fmt(byCode.IGEM.Hf, 3)}${st.smys <= 361 ? ' (≤ L360: not applied)' : ''}`, fmt(byCode.IGEM.P * 10, 1), 'barg', ref('R5', 'R67')],
+        [`CSA Z662 Cl. 17 — F·L = ${fmt(byCode.CSA.csaFL, 2)}; governed by ${byCode.CSA.governs}`, fmt(byCode.CSA.P * 10, 1), 'barg', ref('R69', 'R70')],
         ['Temperature derating factor T', fmt(Tf, 3), '–', ref('R1')],
-        [`<b>Hydrogen MAOP (Option ${v.opt}, ≤ existing MAOP)</b>`, `<b>${fmt(newMaop, 1)}</b>`, 'barg · ' + psig(newMaop)],
+        [`<b>Hydrogen MAOP (${esc(codeName)}, ≤ existing MAOP)</b>`, `<b>${fmt(newMaop, 1)}</b>`, 'barg · ' + psig(newMaop)],
         ['Derating vs existing MAOP', fmt((1 - newMaop / v.maop) * 100, 1), '%'],
         ['Hydrogen partial pressure at MAOP', fmt(pH2, 1), 'bar(a)', ref('R39')],
         [`Energy capacity, ${pr.len || 120} km to ${pmin} barg (H2 / NG)`, `${fmt(eH, 0)} / ${fmt(eNG, 0)}`, 'MW · ' + pct(eH / eNG)]
-      ]) + (v.opt === 'B' ? note('Option B requires fracture-mechanics qualification of base metal, seam and HAZ in hydrogen (KIH ≥ 55 MPa√m) and chemistry limits (P ≤ 0.015 %). ' + ref('R2', 'R51'), 'warn') : note('Option A uses the material performance factor Hf from the code table (editable in Code tables). ' + ref('R2'))));
+      ]) + (v.opt === 'IGEM' ? note('IGEM/TD/1 Supp 2: design factor capped at 0.5; B31.12 Hf applied to grades above L360; fracture-toughness testing in hydrogen required; blends above ' + L.igemBlend + ' mol % H2 are treated as 100 % H2. Class mapping 1→R, 2→S, 3/4→T is a tool assumption — edit in Code tables. ' + ref('R5', 'R67'), 'warn') : v.opt === 'CSA' ? note('CSA Z662:23 Clause 17 requires an engineering assessment rather than fixed limits. The tool uses the lower of the Z662 design factor (F·L) and the ASME B31.12 Option A factor that Z662 cites as guidance — a screening interpretation, not a code value. ' + ref('R69', 'R70'), 'warn') : '') + (v.opt === 'B' ? note('Option B requires fracture-mechanics qualification of base metal, seam and HAZ in hydrogen (KIH ≥ 55 MPa√m) and chemistry limits (P ≤ 0.015 %). ' + ref('R2', 'R51'), 'warn') : note('Option A uses the material performance factor Hf from the code table (editable in Code tables). ' + ref('R2'))));
       html += card(`Material & condition screening — ${chip(verdict[0], verdict[1])}`, table(['Check', 'Value', 'Criterion', 'Status', 'Ref', 'Action / note'], checks.map(c => [c.n, c.val, c.lim, chip(c.s, U.statusWord[c.s]), c.rf, c.act])));
+      const igemFull = v.h2 > L.igemBlend;
+      html += card('Code requirements — ASME B31.12, IGEM/TD/1 Supp 2, CSA Z662:23, EIGA', table(['Requirement', 'ASME B31.12 ' + ref('R2'), 'IGEM/TD/1 Supp 2 ' + ref('R5'), 'CSA Z662:23 Cl. 17 ' + ref('R69'), 'EIGA 121/14 ' + ref('R3')], D.CODE_REQS.map(r => [`<b>${esc(r.req)}</b>`, esc(r.b31), esc(r.igem), esc(r.csa), esc(r.eiga)])) +
+        kv([['Allowable pressure (this pipe)', `${fmt(pA, 1)} / ${fmt(byCode.IGEM.P * 10, 1)} / ${fmt(byCode.CSA.P * 10, 1)}`, 'barg (B31.12 A / IGEM / CSA)'],
+          ['IGEM blend threshold at ' + v.h2 + ' % H2', igemFull ? chip('r', `> ${L.igemBlend} %: full H2 requirements`) : chip('a', `≤ ${L.igemBlend} %: check blend provisions`), '', ref('R5')],
+          ['IGEM fracture-toughness testing in H2', v.kih > 0 ? chip('g', 'Data provided') : chip('r', 'Required — not yet tested'), '', ref('R5')],
+          ['IGEM / EIGA CE ≤ ' + L.ceIGEM, ce <= L.ceIGEM ? chip('g', 'CE ' + fmt(ce, 3)) : chip('r', 'CE ' + fmt(ce, 3)), '', ref('R5', 'R3')],
+          ['CSA Z662 Clause 17 engineering assessment', chip('a', 'Required for H2 and blends'), '', ref('R69')]]) +
+        note('Code text summarised from public sources (IGEM/CSA documents were not available in full). Values marked “verify” and all factors in Code tables must be checked against the licensed editions.', 'warn'));
       const acts = checks.filter(c => c.s !== 'g').map(c => `<li>${chip(c.s, c.n)} ${c.act}</li>`).join('');
       html += card('Recommended programme before conversion', `<ol class="steps">${acts}<li>Hydrostatic or pneumatic strength test to establish the H2 MAOP; N₂ purge and drying (dew point < −40 °C).</li><li>Replace or re-qualify valves, seals, instruments and compressors (see Instruments & equipment).</li><li>Update integrity management plan and safety case (PIR with H2, see Hydrogen safety).</li></ol>`);
       return { html, csv: { name: 'repurposing_screening', rows: [['Check', 'Value', 'Criterion', 'Status', 'Action'], ...checks.map(c => [c.n, String(c.val).replace(/<[^>]+>/g, ''), c.lim, U.statusWord[c.s], c.act])] } };
@@ -317,6 +334,7 @@
         lineChart({ title: 'Outlet velocity vs H2 fraction', xLabel: 'H2 in blend (mol %)', yLabel: 'm/s', series: [{ name: 'Outlet velocity', pts: sweep.map(s => [s.x, s.vOut]), ci: 3 }, { name: 'Erosional velocity (API RP 14E)', pts: sweep.map(s => [s.x, s.vEros]), ci: 4, dash: true }] }) +
         (v.mode === 'energy' && sweep.some(s => !s.feasible) ? note(`Above ~${sweep.find(s => !s.feasible).x} % H2 the fixed energy demand cannot be delivered within MAOP for this segment — more compression stations or looping would be needed.`, 'warn') : ''));
       const tol = D.TOLERANCE.map(t => [t.c, fmt(t.pct, t.pct < 1 ? 1 : 0) + ' %', chip(v.h2 <= t.pct ? 'g' : 'r', v.h2 <= t.pct ? 'Within' : 'Exceeds'), t.note, ref(...t.src.split(', '))]);
+      html += card(`Code & regulatory thresholds at ${v.h2} % H2`, table(['Code / regulation', 'Threshold', 'Status', 'Ref'], D.BLEND_RULES.map(r => { const over = v.h2 > r.lim; return [r.c, r.lim > 0 ? r.lim + ' mol %' : 'any H2', chip(over ? (r.lim === 0 ? 'a' : 'r') : 'g', over ? r.above : r.below), ref(...r.src.split(', '))]; })));
       html += card('Materials exposure at this blend', kv([
         ['H2 partial pressure at MAOP', fmt(b.pH2, 2), 'bar(a)', ref('R39')],
         ['Fracture toughness', b.pH2 > 0 ? 'Reduced — knock-down applies even below 1 bar H2' : '—', '', ref('R39', 'R38')],
@@ -344,7 +362,7 @@
         { k: 'psrc', l: 'Source pressure (electrolyser / plant)', u: 'barg', v: 30 },
         { k: 'temp', l: 'Flowing temperature', u: '°C', v: 20 }, { k: 'dz', l: 'Elevation change', u: 'm', v: 0 }] },
       { title: 'Mechanical design', fields: [
-        { k: 'opt', l: 'B31.12 method', t: 'sel', o: [['A', 'Option A — prescriptive'], ['B', 'Option B — performance-based']], v: 'A', ref: 'R2' },
+        { k: 'opt', l: 'Design code / method', t: 'sel', o: codeOpts, v: 'A', ref: ['R2', 'R5', 'R69'] },
         { k: 'loc', l: 'Location class', t: 'sel', o: locOpts, v: 1 },
         { k: 'grade', l: 'Grade', t: 'sel', o: gradeOpts, v: 'X52 (L360)', ref: 'R3' },
         { k: 'tdes', l: 'Design temperature', u: '°C', v: 50 }, { k: 'tmin', l: 'Minimum design temperature', u: '°C', v: -10 },
@@ -358,12 +376,12 @@
     ],
     compute(v) {
       const t = T(); const c = mix(v.h2); const mdot = flowToMdot(c, v.unit, v.flow); const Tk = v.temp + 273.15; const g = U.gradeBy(v.grade);
-      const Tf = E.tempDerating(v.tdes); const F = (v.opt === 'B' ? t.F_B : t.F_A)[v.loc];
-      const hf = v.opt === 'B' ? 1 : E.hfLookup(t.hf, g.smts, v.pdes / 10).hf;
+      const Tf = E.tempDerating(v.tdes); const cf = E.codeFactor(v.opt, t, v.loc, g.smys, g.smts, v.pdes / 10);
+      const F = cf.F, hf = cf.Hf, eff = cf.eff;
       const cands = [];
       for (const [nps, OD] of D.PIPE_OD) {
         if (OD < 100) continue;
-        const treq = v.pdes / 10 * OD / (2 * g.smys * F * Tf * hf) + v.ca;
+        const treq = v.pdes / 10 * OD / (2 * g.smys * eff * Tf) + v.ca;
         const tsel = D.WALLS.find(w => w >= Math.max(treq, v.tMin, OD / v.dtMax)) || NaN;
         if (!isFinite(tsel)) continue;
         const ID = (OD - 2 * tsel) / 1000; const A = Math.PI * ID * ID / 4;
@@ -376,7 +394,7 @@
       if (!sel) sel = cands[cands.length - 1];
       let html = card('Size screening (all standard NPS)', table(['NPS', 'OD mm', 't req mm', 't sel mm', 'Outlet barg', 'Outlet v m/s', 'Hoop % SMYS', 'Steel t/km', 'Status'],
         cands.map(x => ({ _cls: x === sel ? 'sel' : '', cells: [x.nps + '"', fmt(x.OD, 1), fmt(x.treq, 2), fmt(x.tsel, 1), isFinite(x.p2) ? fmt(x.p2, 1) : 'infeasible', isFinite(x.vOut) ? fmt(x.vOut, 1) : '—', fmt(x.hoop, 1), fmt(x.steel, 1), x.ok ? chip('g', 'Feasible') : chip('r', !isFinite(x.p2) || x.p2 < v.pmin ? 'Δp too high' : 'Velocity')] })), { num: [0, 1, 1, 1, 1, 1, 1, 1, 0] }) +
-        note(`t = P·D/(2·S·F·E·T·Hf) + CA with F = ${F}, Hf = ${fmt(hf, 3)}, T = ${fmt(Tf, 3)}; wall rounded up to the next standard thickness, D/t ≤ ${v.dtMax}. ${ref('R2')}`));
+        note(`${esc(D.CODES.find(c => c.k === v.opt).l)}: t = P·D/(2·S·E·T·F·Hf) + CA with F·Hf = ${fmt(eff, 3)} (F = ${fmt(F, 2)}, Hf = ${fmt(hf, 3)}${cf.governs ? ', governed by ' + cf.governs : ''}), T = ${fmt(Tf, 3)}; wall rounded up to the next standard thickness, D/t ≤ ${v.dtMax}. ${ref(D.CODES.find(c => c.k === v.opt).ref)}`));
       if (!sel) return { html };
       const P0 = v.pdes / 10; const hydroRatio = Math.max(t.hydro[v.loc], 1.25); // 1.25 floor adopted for H2 service (tool default)
       const bt = E.btcm({ D: sel.OD, t: sel.tsel, SMYS: g.smys, P0: P0 + 0.101, T: Tk, c });
@@ -384,7 +402,7 @@
       const comp = v.pin > v.psrc ? E.compressor({ c, mdot, ps: bar(v.psrc), pd: bar(v.pin), Ts: Tk, eta: v.eta, maxRatio: 3 }) : null;
       const lp = E.linepack({ c, D: sel.ID / 1, L: v.len * 1000, p1: bar(v.pin), p2: bar(Math.max(sel.p2, 0)), T: Tk });
       const prof = []; for (let i = 0; i <= 20; i++) { const Li = v.len * 1000 * i / 20; const o = i ? E.pipeOutlet({ c, D: sel.ID, L: Li, p1: bar(v.pin), mdot, T: Tk, rough: v.rough / 1000, E: v.eff, dz: v.dz * i / 20 }) : { p2: bar(v.pin) }; prof.push([Li / 1000, barg(o.p2)]); }
-      const maop = E.barlowP(g.smys, sel.tsel - v.ca, sel.OD, F, 1, Tf, v.opt === 'B' ? 1 : E.hfLookup(t.hf, g.smts, v.pdes / 10).hf) * 10;
+      const maop = E.codeAllowP(v.opt, t, { loc: v.loc, smys: g.smys, smts: g.smts, t: sel.tsel - v.ca, D: sel.OD, E: 1, T: Tf }).P * 10;
       html += card(`Selected design: ${sel.nps}" × ${fmt(sel.tsel, 1)} mm ${esc(v.grade)} PSL2`, kv([
         ['Mass flow / energy flow', `${fmt(mdot, 3)} kg/s / ${fmt(E.energyMW(c, mdot, basis()), 0)} MW`, basis()],
         ['Standard volume flow', fmt(E.stdFlow(c, mdot) * 86400 / 1e6, 3), 'MMSCMD'],

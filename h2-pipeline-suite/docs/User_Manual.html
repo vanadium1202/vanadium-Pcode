@@ -68,10 +68,10 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
   <a href="#glossary">22. Glossary</a>
 </nav>
 <main>
-<p class="eyebrow">User manual · version 1.0</p>
+<p class="eyebrow">User manual · version 1.1</p>
 <h1>H2 Pipeline Suite</h1>
 <p class="lead">A workbook for moving hydrogen by pipeline: repurposing natural-gas lines, designing new hydrogen lines, blending hydrogen into natural gas, and blending in city gas networks — with safety, integrity, repair and specification tools.</p>
-<div class="box warn"><b>Please note.</b> This is a screening and option-study tool. Code values (ASME B31.12, B31.8 and others) were transcribed from public sources and can be edited. Check them against your licensed standards. Final design, MAOP and safety decisions need review by a competent engineer.</div>
+<div class="box warn"><b>Please note.</b> IGEM/TD/1 Supplement 2 and CSA Z662:23 Clause 17 content is summarised from public sources; the IGEM factors for Classes S and T and the CSA location factors are marked “verify” in Code tables. This is a screening and option-study tool. Code values (ASME B31.12, B31.8 and others) were transcribed from public sources and can be edited. Check them against your licensed standards. Final design, MAOP and safety decisions need review by a competent engineer.</div>
 
 <h2 id="start">1. Getting started</h2>
 <ol class="steps">
@@ -125,14 +125,19 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 <p>This module answers two questions: <i>is the steel suitable?</i> and <i>what pressure is allowed?</i></p>
 <h3>Inputs</h3>
 <ul>
-  <li><b>Service &amp; pipe</b> — hydrogen %, dimensions, grade, seam, existing MAOP, location class, design temperature and the B31.12 method: <b>Option A</b> (prescriptive, uses the material performance factor Hf) or <b>Option B</b> (performance-based, needs hydrogen fracture tests).</li>
+  <li><b>Service &amp; pipe</b> — hydrogen %, dimensions, grade, seam, existing MAOP, location class, design temperature and the <b>design code / method</b>:
+    <ul><li><b>ASME B31.12 Option A</b> — prescriptive, uses the material performance factor Hf.</li>
+    <li><b>ASME B31.12 Option B</b> — performance-based, needs hydrogen fracture tests (K<sub>IH</sub> ≥ 55 MPa√m).</li>
+    <li><b>IGEM/TD/1 Edition 6 Supplement 2</b> (UK) — design factor capped at 0.5, Hf applied to grades above L360, fracture-toughness testing in hydrogen required, blends above 10 mol % treated as pure hydrogen.</li>
+    <li><b>CSA Z662:23 Clause 17</b> (Canada) — requires an engineering assessment rather than fixed limits. The tool uses the lower of the Z662 design factor (F × location factor) and the B31.12 Option A factor that Z662 cites as guidance.</li></ul></li>
   <li><b>Material test data</b> — from mill certificates, field hardness surveys or cut-outs: maximum yield/tensile strength, hardness of base metal and welds, hard spots found by ILI, Charpy energy, DWTT, and K<sub>IH</sub> if tested.</li>
   <li><b>Chemistry</b> — the tool calculates CE(IIW) and Pcm.</li>
   <li><b>Condition &amp; history</b> — cracks, dents, metal loss, girth-weld practice, pressure-test ratio, CP potential and pressure cycling.</li>
 </ul>
 <h3>Results</h3>
 <ul>
-  <li><b>MAOP re-rating</b>: B31.8 value for gas, B31.12 Option A (with Hf) and Option B, the derating in %, hydrogen partial pressure and the energy capacity after conversion.</li>
+  <li><b>MAOP re-rating</b>: B31.8 value for gas, then B31.12 Option A and B, IGEM/TD/1 Supplement 2 and CSA Z662 Clause 17, the derating in %, hydrogen partial pressure and the energy capacity after conversion.</li>
+  <li><b>Code requirements table</b>: side-by-side requirements of ASME B31.12, IGEM/TD/1 Supp 2, CSA Z662:23 and EIGA 121/14 (design factor, Hf, hardness, CE, toughness and fatigue testing, repurposing), with checks against your data.</li>
   <li><b>Screening table</b>: about 20 checks (hardness, hard spots, seam, grade, chemistry, toughness, K<sub>IH</sub>, cracks, dents, girth welds, test record, CP, stress level, cycling) with a status, the criterion, the reference and the action needed.</li>
   <li><b>Recommended programme</b>: the actions to close every amber and red item before conversion.</li>
 </ul>
@@ -146,12 +151,13 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
   <li><b>Leakage</b>: your baseline natural-gas leakage as % of throughput and the leak type.</li>
 </ul>
 <p><b>What “energy loss” means here.</b> The energy a compressor station must spend to push the gas through the segment (to restore the pressure drop), divided by the energy delivered. Hydrogen-rich gas needs more volume for the same energy, so compression energy rises with the blend. The tool also shows leakage energy, line-pack energy, outlet velocity against the erosional limit, Wobbe change and the hydrogen partial pressure the steel sees.</p>
+<p>The <b>code &amp; regulatory thresholds</b> table shows what applies at your blend level: IGEM (above 10 mol % = pure-hydrogen rules), CSA Z662 Clause 17 (any hydrogen = engineering assessment), ASME B31.12, UK GS(M)R (0.1 mol %), the Alberta 20 % distribution recommendation and India PNGRB.</p>
 <p>The <b>tolerance table</b> lists typical maximum blend levels for components and end users (pipelines, PE pipe, appliances, meters, gas chromatographs, CNG cylinders, gas turbines, storage), including India’s PNGRB preliminary limits.</p>
 
 <h2 id="design">8. New hydrogen pipeline design</h2>
 <ol class="steps">
   <li>Enter the <b>duty</b>: hydrogen %, design flow (tonne/day, kg/s, MW or MMSCMD), length, inlet and design pressure, minimum delivery pressure and source (electrolyser/plant) pressure.</li>
-  <li>Enter the <b>mechanical design</b> basis: B31.12 Option A or B, location class, grade, design and minimum temperatures, corrosion allowance, maximum D/t and minimum wall.</li>
+  <li>Enter the <b>mechanical design</b> basis: design code (B31.12 Option A or B, IGEM/TD/1 Supp 2 or CSA Z662 Clause 17), location class, grade, design and minimum temperatures, corrosion allowance, maximum D/t and minimum wall.</li>
   <li>Enter the <b>hydraulic criteria</b>: roughness, efficiency, maximum velocity. Leave “Force NPS” at 0 to let the tool pick the smallest feasible size.</li>
 </ol>
 <p>The <b>size screening</b> table checks every standard NPS: required and selected wall, outlet pressure, velocity, hoop stress and steel tonnage. The highlighted row is the selected design. Below it you get MAOP, hydrotest pressure, line pack, the Charpy energy needed to arrest a running ductile fracture (Battelle two-curve method), compression power from the source pressure and a pressure profile.</p>
@@ -229,10 +235,10 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 <div class="box">If you open the tool inside a viewer that blocks downloads (for example an embedded web page), a message offers <b>Copy content</b>: paste it into Notepad or TextEdit and save with the file name shown. Opening the HTML file directly from your disk has no such limit.</div>
 
 <h2 id="codes">18. Code tables</h2>
-<p>All code values used by the calculations are here and editable: the B31.12 Hf table, design factors by location class (B31.8, B31.12 Option A and B), hydrotest ratios, screening limits (hardness, CE, S, P, Charpy, K<sub>IH</sub>, stress levels, dent limits, CP limit), fatigue-crack-growth constants and rupture-fire parameters. Changes apply immediately to every module and are saved with the project. <b>Reset all tables</b> restores the defaults.</p>
+<p>All code values used by the calculations are here and editable: the B31.12 Hf table, design factors by location class (B31.8, B31.12 Option A and B, IGEM/TD/1 Supp 2 — mapped Class 1→R, 2→S, 3/4→T — and the CSA Z662 location factor), hydrotest ratios, screening limits (hardness, CE, S, P, Charpy, K<sub>IH</sub>, stress levels, dent limits, CP limit), fatigue-crack-growth constants and rupture-fire parameters. Changes apply immediately to every module and are saved with the project. <b>Reset all tables</b> restores the defaults.</p>
 
 <h2 id="verify">19. Verification</h2>
-<p>The Verification module runs 17 test cases against published values (ISO 6976, EN 437 test gases, API 520 example, ASTM E1049 example, ASME B31.8S and B31.12 PIR constants) and an independent Python calculation (with GERG-2008 compressibility). All pass at the stated tolerances. Re-run it after editing code tables.</p>
+<p>The Verification module runs 19 test cases against published values (ISO 6976, EN 437 test gases, API 520 example, ASTM E1049 example, ASME B31.8S and B31.12 PIR constants) an independent Python calculation (with GERG-2008 compressibility) and hand checks of the IGEM and CSA design pressures. All pass at the stated tolerances. Re-run it after editing code tables.</p>
 
 <h2 id="formats">20. File formats</h2>
 <div class="tw"><table>
@@ -266,7 +272,7 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 <tr><td><b>pH2</b></td><td>Hydrogen partial pressure = total pressure × hydrogen fraction.</td></tr>
 <tr><td><b>Wobbe index</b></td><td>Heating value ÷ √(relative density); measures interchangeability of gases in burners.</td></tr>
 </table></div>
-<p style="margin-top:40px;color:var(--muted);font-size:13px">H2 Pipeline Suite v1.0 — screening-level engineering tool. References for every method are listed in the tool under Data &amp; QA → References.</p>
+<p style="margin-top:40px;color:var(--muted);font-size:13px">H2 Pipeline Suite v1.1 — screening-level engineering tool. References for every method are listed in the tool under Data &amp; QA → References.</p>
 </main>
 </div>
 </body>

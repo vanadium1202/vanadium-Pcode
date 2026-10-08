@@ -307,6 +307,27 @@
     return { P: lo, Hf: hfLookup(table, smts, lo).hf, P0 };
   }
 
+  /* ---------- design basis by code [R2 B31.12, R5 IGEM/TD/1 Supp 2, R69 CSA Z662 Cl. 17] ----------
+     Returns the effective factor (F × Hf, or F × L for CSA) applied to 2·S·t/D·E·T at pressure p (MPa).
+     IGEM: 0.5-capped design factor with B31.12 Hf only for grades above L360.
+     CSA: Clause 17 requires an engineering assessment; the tool takes the LOWER of the Z662 design
+          factor (F·L) and the B31.12 Option A factor that Z662 cites as guidance (tool interpretation). */
+  function codeFactor(code, t, loc, smys, smts, pMPa) {
+    const hf = () => { const h = hfLookup(t.hf, smts, pMPa).hf; return isNaN(h) ? NaN : h; };
+    if (code === 'B') return { F: t.F_B[loc], Hf: 1, eff: t.F_B[loc] };
+    if (code === 'IGEM') { const F = t.F_IGEM[loc]; const H = smys > 361 ? hf() : 1; return { F, Hf: H, eff: F * H }; }
+    if (code === 'CSA') { const fl = t.limits.F_CSA * t.L_CSA[loc]; const a = t.F_A[loc] * hf(); return { F: fl, Hf: 1, eff: Math.min(fl, a), csaFL: fl, b3112: a, governs: a < fl ? 'B31.12 Option A' : 'Z662 F·L' }; }
+    const H = hf(); return { F: t.F_A[loc], Hf: H, eff: t.F_A[loc] * H };
+  }
+  // allowable design pressure (MPa) solving P = 2·S·t/D·E·T·eff(P)
+  function codeAllowP(code, t, o) { // o: {loc, smys, smts, t (mm), D (mm), E, T}
+    const P0 = 2 * o.smys * o.t / o.D * (o.E ?? 1) * (o.T ?? 1);
+    const g = P => { const e = codeFactor(code, t, o.loc, o.smys, o.smts, P).eff; return isNaN(e) ? -1 : P0 * e - P; };
+    let lo = 0, hi = P0; for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (g(m) >= 0) lo = m; else hi = m; }
+    const f = codeFactor(code, t, o.loc, o.smys, o.smts, lo);
+    return { P: lo, ...f };
+  }
+
   /* ---------- metal loss: Modified B31G (0.85dL) [R10] ---------- */
   function modB31G(o) { // {D, t, d, L (mm), SMYS MPa}
     const Sflow = o.SMYS + 68.95; const z = o.L * o.L / (o.D * o.t);
@@ -582,12 +603,14 @@
     add('V16', 'EN 1011-2 preheat, CET 0.30, 20 mm, HD 5, Q 1.0 kJ/mm', 'R30', preheatEN1011({ CET: 0.30, d: 20, HD: 5, Q: 1.0 }), 56.53, 0.1, '°C', 'Hand calculation of EN 1011-2 Annex C Eq. C.5');
     const pf = pipeFlow({ c: ch4, D: 0.5906, L: 100e3, p1: 70e5 + PATM, p2: 50e5 + PATM, T: 288.15, rough: 4.57e-5, E: 1 });
     add('V17', 'General flow eq. 24" pipe, 100 km, 70→50 barg CH4 (mass flow)', 'R45', pf.mdot, 84.09, 2.0, 'kg/s', 'Independent Python solver with GERG-2008 Z (tests/hand_calcs.py)');
+    add('V18', 'IGEM/TD/1 Supp 2 allowable, 610 × 9.5 mm L360, Class R (F = 0.5)', 'R5', codeAllowP('IGEM', tables, { loc: 0, smys: 360, smts: 460, t: 9.5, D: 610 }).P, 5.6066, 0.1, 'MPa', 'Hand calculation 2·360·9.5/610·0.5 (Hf not applied ≤ L360)');
+    add('V19', 'CSA Z662 F·L, 610 × 9.5 mm X52, Class 1 (0.8 × 1.0)', 'R69', barlowP(360, 9.5, 610, tables.limits.F_CSA * tables.L_CSA[0]), 8.9705, 0.1, 'MPa', 'Hand calculation 2·360·9.5/610·0.8');
     return out;
   }
 
   const api = { zCorr, RU, PATM, G, M_AIR, COMP, KEYS, normalize, blend, molarMass, isoProps, zStd, cpR, gammaIdeal, prZ, viscMix, viscPure, state,
     flammability, co2PerGJ, colebrook, pAvg, pipeFlow, pipeOutlet, pipeInlet, compressor, linepack, energyMW, mdotFromMW, stdFlow,
-    chokedMassFlux, leakRatios, barlowP, tempDerating, hfLookup, b3112OptionA, modB31G, newmanRaju, bulging, crackK, fcgr, FCG_DEFAULT,
+    chokedMassFlux, leakRatios, barlowP, tempDerating, hfLookup, b3112OptionA, codeFactor, codeAllowP, modB31G, newmanRaju, bulging, crackK, fcgr, FCG_DEFAULT,
     crackGrowth, criticalDepth, reversals, rainflow, decompressionSpeed, btcm, release, flameLength, defaultXr, pointSourceDistance,
     jetLFLDistance, jetFlammableMass, millsOverpressure, distanceForOverpressure, pir, probitFatality, normCdf, blowdown, psvArea, API526,
     cet, ceIIW, pcm, preheatEN1011, verificationCases };
