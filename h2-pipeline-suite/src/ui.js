@@ -100,7 +100,19 @@
   function showCopyDialog(text) {
     const dlg = $('#copyDlg'); $('#copyArea').value = text; dlg.hidden = false; $('#copyArea').select();
   }
+  // Hosted viewer (claude.ai): downloads go through the platform's downloads capability.
+  // Opened locally from disk, window.claude is absent and a normal browser download is used.
+  let DL = null;
+  try { if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { DL = d; }, () => { }); } catch (e) { /* not hosted */ }
   function download(name, content, mime = 'text/plain') {
+    if (DL) {
+      const fname = name.replace(/\.doc$/i, '.html');
+      DL.save({ filename: fname, data: content }).then(() => toast(`Saved <b>${esc(fname)}</b>${fname !== name ? ' (open it in Word)' : ''}.`), e => {
+        if (e && e.code === 'declined') return;
+        if (typeof content === 'string') showCopyDialog(content); else toast('This viewer cannot save files. Open the tool from your disk instead.');
+      });
+      return;
+    }
     try {
       const blob = content instanceof Blob ? content : new Blob([content], { type: mime + ';charset=utf-8' });
       const url = URL.createObjectURL(blob); const a = document.createElement('a');
